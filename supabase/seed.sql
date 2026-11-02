@@ -1,0 +1,2 @@
+-- Initial seed data for Parijat Society
+-- Will be populated with society setup and masters
