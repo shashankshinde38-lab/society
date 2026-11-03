@@ -14,6 +14,10 @@ import {
   Society,
   MaintenancePayment,
   DashboardMetrics,
+  EmailLog,
+  Role,
+  AdminUser,
+  SystemModuleKey,
 } from "@/types/database.types";
 
 import {
@@ -26,6 +30,9 @@ import {
   initialExpenses,
   initialPayments,
   initialWalletTransactions,
+  initialRoles,
+  initialAdminUsers,
+  initialEmailLogs,
 } from "./mockInitialData";
 
 const STORAGE_KEY_PREFIX = "parijat_erp_v5_";
@@ -81,7 +88,11 @@ function generateYearlyInvoices(flats: Flat[], year: number = 2026, monthlyAmt: 
 export const DataStorage = {
   // --- SOCIETY ---
   getSociety(): Society {
-    return getStoredItem("society", initialSociety);
+    const stored = getStoredItem("society", initialSociety);
+    return {
+      ...initialSociety,
+      ...stored,
+    };
   },
   updateSociety(data: Partial<Society>): Society {
     const current = this.getSociety();
@@ -209,8 +220,8 @@ export const DataStorage = {
     });
   },
   addFlat(flatData: Omit<Flat, "id" | "society_id" | "created_at" | "updated_at">): Flat {
-    const flats = this.getFlats();
-    const exists = flats.some((f) => f.flat_number.toUpperCase() === flatData.flat_number.toUpperCase());
+    const rawFlats = getStoredItem<Flat[]>("flats", initialFlats);
+    const exists = rawFlats.some((f) => f.flat_number.toUpperCase() === flatData.flat_number.toUpperCase());
     if (exists) throw new Error(`Flat number ${flatData.flat_number} already exists!`);
 
     const newFlat: Flat = {
@@ -220,13 +231,11 @@ export const DataStorage = {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    flats.push(newFlat);
-    setStoredItem("flats", flats);
+    rawFlats.push(newFlat);
+    setStoredItem("flats", rawFlats);
 
-    // Also auto-generate invoices for new flat
-    const allInvoices = this.getInvoices();
-    const newInvoices = generateYearlyInvoices([newFlat], 2026, 1100);
-    setStoredItem("invoices", [...allInvoices, ...newInvoices]);
+    // Initialise exactly 12 calendar slots for the new flat (starts at NO_DUES)
+    this.getInvoices(newFlat.id, 2026);
 
     return newFlat;
   },
@@ -239,8 +248,10 @@ export const DataStorage = {
     return flats[idx];
   },
   deleteFlat(id: string): void {
-    const flats = this.getFlats().filter((f) => f.id !== id);
-    setStoredItem("flats", flats);
+    const rawFlats = getStoredItem<Flat[]>("flats", initialFlats).filter((f) => f.id !== id);
+    setStoredItem("flats", rawFlats);
+    const rawInvoices = getStoredItem<MaintenanceInvoice[]>("invoices", []).filter((i) => i.flat_id !== id);
+    setStoredItem("invoices", rawInvoices);
   },
 
   // --- RESIDENTS & OCCUPANCY HISTORY ---
@@ -342,6 +353,38 @@ export const DataStorage = {
     return { current: newResident, archived: archivedRecord };
   },
 
+  seedStarterResidents(): void {
+    const existingFlats = this.getFlats();
+    if (existingFlats.length > 0) return;
+
+    // 1. Add Floors
+    const f1 = this.addFloor({ floor_number: 1, floor_name: "1st Floor", description: null, status: "ACTIVE", is_archived: false });
+    const f2 = this.addFloor({ floor_number: 2, floor_name: "2nd Floor", description: null, status: "ACTIVE", is_archived: false });
+    const f3 = this.addFloor({ floor_number: 3, floor_name: "3rd Floor", description: null, status: "ACTIVE", is_archived: false });
+    const f4 = this.addFloor({ floor_number: 4, floor_name: "4th Floor", description: null, status: "ACTIVE", is_archived: false });
+
+    // 2. Add Flats
+    const flat101 = this.addFlat({ floor_id: f1.id, flat_number: "A-101", flat_type: "2BHK", area_sqft: 850, maintenance_override: null, status: "OCCUPIED", description: null });
+    const flat204 = this.addFlat({ floor_id: f2.id, flat_number: "A-204", flat_type: "3BHK", area_sqft: 1100, maintenance_override: null, status: "OCCUPIED", description: null });
+    const flat302 = this.addFlat({ floor_id: f3.id, flat_number: "A-302", flat_type: "2BHK", area_sqft: 850, maintenance_override: null, status: "OCCUPIED", description: null });
+    const flat401 = this.addFlat({ floor_id: f4.id, flat_number: "A-401", flat_type: "2BHK", area_sqft: 850, maintenance_override: null, status: "OCCUPIED", description: null });
+    const flat402 = this.addFlat({ floor_id: f4.id, flat_number: "A-402", flat_type: "2BHK", area_sqft: 850, maintenance_override: null, status: "OCCUPIED", description: null });
+
+    // 3. Add Residents
+    this.addResident({ flat_id: flat101.id, full_name: "Rajesh Sharma", resident_type: "OWNER", email: "rajesh.sharma@gmail.com", mobile: "+91 98220 11001", alternate_mobile: null, move_in_date: "2025-01-01", move_out_date: null });
+    this.addResident({ flat_id: flat204.id, full_name: "Anita Joshi", resident_type: "OWNER", email: "anita.joshi@gmail.com", mobile: "+91 98220 22002", alternate_mobile: null, move_in_date: "2025-02-01", move_out_date: null });
+    this.addResident({ flat_id: flat302.id, full_name: "Sunil Mehta", resident_type: "TENANT", email: "sunil.mehta@gmail.com", mobile: "+91 98220 33003", alternate_mobile: null, move_in_date: "2025-06-01", move_out_date: null });
+    this.addResident({ flat_id: flat401.id, full_name: "Suresh Kulkarni", resident_type: "OWNER", email: "suresh.kulkarni@gmail.com", mobile: "+91 98220 44004", alternate_mobile: null, move_in_date: "2024-11-01", move_out_date: null });
+    this.addResident({ flat_id: flat402.id, full_name: "Pratik Mohol", resident_type: "OWNER", email: "pratik.mohol@gmail.com", mobile: "+91 98220 55005", alternate_mobile: null, move_in_date: "2024-10-01", move_out_date: null });
+
+    // 4. Generate Unpaid Dues for April 2026 (Month 4)
+    this.generateMonthlyDues(flat101.id, 2026, [4], 1100);
+    this.generateMonthlyDues(flat204.id, 2026, [4], 1100);
+    this.generateMonthlyDues(flat302.id, 2026, [4], 1100);
+    this.generateMonthlyDues(flat401.id, 2026, [3, 4], 1100);
+    this.generateMonthlyDues(flat402.id, 2026, [4], 1100);
+  },
+
   // --- ADVANCE POOL & WALLET SYSTEM ---
   getAdvanceBalances(): Record<string, number> {
     return getStoredItem<Record<string, number>>("advance_balances", {});
@@ -362,17 +405,77 @@ export const DataStorage = {
 
   // --- INVOICES & MAINTENANCE CALENDAR ---
   getInvoices(flatId?: string, year: number = 2026): MaintenanceInvoice[] {
-    let invoices = getStoredItem<MaintenanceInvoice[]>("invoices", []);
-    if (!invoices || invoices.length === 0) {
-      const flats = getStoredItem("flats", initialFlats);
-      invoices = generateYearlyInvoices(flats, year, 1100);
-      setStoredItem("invoices", invoices);
+    const rawInvoices = getStoredItem<MaintenanceInvoice[]>("invoices", []);
+    const flats = getStoredItem<Flat[]>("flats", initialFlats);
+    const settings = this.getSettings();
+    const defaultRate = settings.monthly_amount || 1100;
+
+    // 1. Deduplicate by unique key: flat_id + year + month (auto-heals existing duplicates)
+    const invoiceMap = new Map<string, MaintenanceInvoice>();
+    let hadDuplicates = false;
+
+    if (rawInvoices && rawInvoices.length > 0) {
+      for (const inv of rawInvoices) {
+        const key = `${inv.flat_id}_${inv.year}_${inv.month}`;
+        if (!invoiceMap.has(key)) {
+          invoiceMap.set(key, inv);
+        } else {
+          hadDuplicates = true;
+          const existing = invoiceMap.get(key)!;
+          // Prefer invoice that has active payment or dues
+          if (
+            (existing.status === "NO_DUES" && inv.status !== "NO_DUES") ||
+            Number(inv.paid_amount || 0) > Number(existing.paid_amount || 0) ||
+            Number(inv.due_amount || 0) > Number(existing.due_amount || 0)
+          ) {
+            invoiceMap.set(key, inv);
+          }
+        }
+      }
     }
 
-    if (flatId) {
-      return invoices.filter((i) => i.flat_id === flatId && i.year === year);
+    // 2. Ensure each existing flat has exactly 12 months (1 to 12) for the requested year
+    let addedMissing = false;
+    for (const flat of flats) {
+      for (let m = 1; m <= 12; m++) {
+        const key = `${flat.id}_${year}_${m}`;
+        if (!invoiceMap.has(key)) {
+          addedMissing = true;
+          const amt = flat.maintenance_override || defaultRate;
+          invoiceMap.set(key, {
+            id: `inv-${flat.id}-${year}-${m}`,
+            flat_id: flat.id,
+            resident_id: flat.current_resident?.id || null,
+            month: m,
+            year,
+            invoice_amount: amt,
+            paid_amount: 0,
+            due_amount: 0,
+            status: "NO_DUES",
+            due_date: `${year}-${String(m).padStart(2, "0")}-10`,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        }
+      }
     }
-    return invoices;
+
+    const cleanInvoices = Array.from(invoiceMap.values());
+
+    // 3. Persist healed data if duplicates were purged or missing months generated
+    if (hadDuplicates || addedMissing || !rawInvoices || rawInvoices.length !== cleanInvoices.length) {
+      setStoredItem("invoices", cleanInvoices);
+    }
+
+    // 4. If flatId requested, return sorted exactly 12 months (month 1 to 12)
+    if (flatId) {
+      return cleanInvoices
+        .filter((i) => i.flat_id === flatId && i.year === year)
+        .sort((a, b) => a.month - b.month)
+        .slice(0, 12);
+    }
+
+    return cleanInvoices.sort((a, b) => a.year - b.year || a.month - b.month);
   },
 
   generateMonthlyDues(
@@ -415,7 +518,7 @@ export const DataStorage = {
     });
 
     setStoredItem("invoices", invoices);
-    return invoices.filter((i) => i.flat_id === flatId && i.year === year);
+    return this.getInvoices(flatId, year);
   },
 
   // --- PAYMENTS & ATOMIC ALLOCATION ---
@@ -670,5 +773,206 @@ export const DataStorage = {
       currentWalletBalance,
       advanceLiability: this.getTotalAdvancePool(),
     };
+  },
+
+  // --- MAILER & EMAIL LOGS ---
+  getEmailLogs(): EmailLog[] {
+    const raw = getStoredItem<EmailLog[]>("email_logs", initialEmailLogs);
+    // Purge any legacy dummy data
+    const clean = raw.filter((l) => !["log-1", "log-2", "log-3", "log-4"].includes(l.id));
+    if (clean.length !== raw.length) {
+      setStoredItem("email_logs", clean);
+    }
+    return clean;
+  },
+  clearEmailLogs(): void {
+    setStoredItem("email_logs", []);
+  },
+  addEmailLog(logData: Omit<EmailLog, "id" | "sent_at"> & { id?: string; sent_at?: string }): EmailLog {
+    const logs = this.getEmailLogs();
+    const newLog: EmailLog = {
+      ...logData,
+      id: logData.id || "log-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
+      sent_at: logData.sent_at || new Date().toISOString(),
+    };
+    logs.unshift(newLog);
+    setStoredItem("email_logs", logs);
+    return newLog;
+  },
+  updateEmailLog(id: string, data: Partial<EmailLog>): EmailLog {
+    const logs = this.getEmailLogs();
+    const idx = logs.findIndex((l) => l.id === id);
+    if (idx === -1) throw new Error("Email log not found");
+    logs[idx] = { ...logs[idx], ...data };
+    setStoredItem("email_logs", logs);
+    return logs[idx];
+  },
+
+  // --- RBAC: ROLES & PERMISSIONS ---
+  getRoles(): Role[] {
+    return getStoredItem("admin_roles", initialRoles);
+  },
+  addRole(roleData: Omit<Role, "id" | "created_at" | "updated_at">): Role {
+    const roles = this.getRoles();
+    const exists = roles.some((r) => r.name.toLowerCase() === roleData.name.trim().toLowerCase());
+    if (exists) throw new Error(`Role "${roleData.name}" already exists!`);
+
+    const newRole: Role = {
+      ...roleData,
+      name: roleData.name.trim(),
+      id: "role-" + Date.now(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    roles.push(newRole);
+    setStoredItem("admin_roles", roles);
+    return newRole;
+  },
+  updateRole(id: string, data: Partial<Role>): Role {
+    const roles = this.getRoles();
+    const idx = roles.findIndex((r) => r.id === id);
+    if (idx === -1) throw new Error("Role not found");
+
+    // Prevent renaming or weakening system Super Admin
+    if (roles[idx].id === "role-super-admin" && data.name && data.name !== "Super Admin") {
+      throw new Error("Cannot rename the system Super Admin role");
+    }
+
+    roles[idx] = { ...roles[idx], ...data, updated_at: new Date().toISOString() };
+    setStoredItem("admin_roles", roles);
+    return roles[idx];
+  },
+  deleteRole(id: string): void {
+    const roles = this.getRoles();
+    const role = roles.find((r) => r.id === id);
+    if (!role) throw new Error("Role not found");
+    if (role.is_system || role.id === "role-super-admin") {
+      throw new Error("System roles cannot be deleted");
+    }
+
+    const users = this.getUsers();
+    const inUse = users.some((u) => u.role_id === id);
+    if (inUse) {
+      throw new Error(`Cannot delete role "${role.name}" because it is currently assigned to active users. Reassign users first.`);
+    }
+
+    const filtered = roles.filter((r) => r.id !== id);
+    setStoredItem("admin_roles", filtered);
+  },
+
+  // --- RBAC: ADMIN USERS ---
+  getUsers(): AdminUser[] {
+    const users = getStoredItem("admin_users", initialAdminUsers);
+    let changed = false;
+    users.forEach((u) => {
+      if (!u.password) {
+        u.password = "admin@123";
+        changed = true;
+      }
+      if (u.email.toLowerCase() === "pratik.mohol@gmail.com" && u.role_name !== "Accountant") {
+        u.role_id = "role-accountant";
+        u.role_name = "Accountant";
+        changed = true;
+      }
+    });
+    if (changed) {
+      setStoredItem("admin_users", users);
+    }
+    return users;
+  },
+
+  getCurrentUser(): AdminUser {
+    const users = this.getUsers();
+    const stored = getStoredItem<AdminUser | null>("current_user", null);
+    if (stored) {
+      const match = users.find((u) => u.email.toLowerCase() === stored.email.toLowerCase());
+      if (match) return match;
+    }
+    return users[0] || initialAdminUsers[0];
+  },
+
+  setCurrentUser(user: AdminUser | null): void {
+    setStoredItem("current_user", user);
+  },
+  addUser(userData: Omit<AdminUser, "id" | "created_at">): AdminUser {
+    const users = this.getUsers();
+    const exists = users.some((u) => u.email.toLowerCase() === userData.email.trim().toLowerCase());
+    if (exists) throw new Error(`User with email "${userData.email}" already exists!`);
+
+    const roles = this.getRoles();
+    const role = roles.find((r) => r.id === userData.role_id);
+    const roleName = role ? role.name : userData.role_name;
+
+    const newUser: AdminUser = {
+      ...userData,
+      email: userData.email.trim().toLowerCase(),
+      name: userData.name.trim(),
+      role_name: roleName,
+      id: "usr-" + Date.now(),
+      created_at: new Date().toISOString(),
+    };
+    users.push(newUser);
+    setStoredItem("admin_users", users);
+    return newUser;
+  },
+  updateUser(id: string, data: Partial<AdminUser>): AdminUser {
+    const users = this.getUsers();
+    const idx = users.findIndex((u) => u.id === id);
+    if (idx === -1) throw new Error("User not found");
+
+    if (data.role_id) {
+      const roles = this.getRoles();
+      const r = roles.find((role) => role.id === data.role_id);
+      if (r) {
+        data.role_name = r.name;
+      }
+    }
+
+    // Safety: prevent deactivating the last active Super Admin
+    if (users[idx].role_name === "Super Admin" && data.status === "INACTIVE") {
+      const activeSuperAdmins = users.filter((u) => u.role_name === "Super Admin" && u.status === "ACTIVE" && u.id !== id);
+      if (activeSuperAdmins.length === 0) {
+        throw new Error("Cannot deactivate the last active Super Admin account");
+      }
+    }
+
+    users[idx] = { ...users[idx], ...data };
+    setStoredItem("admin_users", users);
+
+    const currentUser = getStoredItem<AdminUser | null>("current_user", null);
+    if (currentUser && currentUser.id === id) {
+      setStoredItem("current_user", users[idx]);
+    }
+
+    return users[idx];
+  },
+  deleteUser(id: string): void {
+    const users = this.getUsers();
+    const user = users.find((u) => u.id === id);
+    if (!user) throw new Error("User not found");
+
+    if (user.role_name === "Super Admin") {
+      const activeSuperAdmins = users.filter((u) => u.role_name === "Super Admin" && u.id !== id);
+      if (activeSuperAdmins.length === 0) {
+        throw new Error("Cannot delete the last Super Admin account. At least one Super Admin is required.");
+      }
+    }
+
+    const filtered = users.filter((u) => u.id !== id);
+    setStoredItem("admin_users", filtered);
+  },
+
+  getUserPermissions(userEmail?: string): Record<SystemModuleKey, { create: boolean; read: boolean; update: boolean; delete: boolean }> {
+    const roles = this.getRoles();
+    const superAdminRole = roles.find((r) => r.id === "role-super-admin") || initialRoles[0];
+
+    if (!userEmail) return superAdminRole.permissions;
+
+    const users = this.getUsers();
+    const user = users.find((u) => u.email.toLowerCase() === userEmail.toLowerCase());
+    if (!user) return superAdminRole.permissions; // Default to admin for main demo user
+
+    const userRole = roles.find((r) => r.id === user.role_id) || roles.find((r) => r.name === user.role_name);
+    return userRole ? userRole.permissions : superAdminRole.permissions;
   },
 };

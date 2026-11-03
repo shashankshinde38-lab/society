@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { clearAdminSession } from "@/features/auth/authActions";
+import { DataStorage } from "@/services/dataStorage";
+import { AdminUser } from "@/types/database.types";
 import { toast } from "sonner";
 
 interface HeaderProps {
@@ -20,6 +22,7 @@ interface HeaderProps {
   onToggleSidebar: () => void;
   onOpenMobileSidebar: () => void;
   userEmail?: string | null;
+  currentUser?: AdminUser | null;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -27,13 +30,19 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleSidebar,
   onOpenMobileSidebar,
   userEmail = "admin@gmail.com",
+  currentUser,
 }) => {
   const router = useRouter();
   const [profileOpen, setProfileOpen] = useState(false);
   const supabase = createClient();
 
+  const activeEmail = currentUser?.email || userEmail || "admin@gmail.com";
+  const activeName = currentUser?.name || (currentUser?.role_name === "Accountant" ? "Pratik Mohol" : "Super Admin");
+  const activeRole = currentUser?.role_name || "Super Admin";
+
   const handleSignOut = async () => {
     try {
+      DataStorage.setCurrentUser(null);
       await clearAdminSession();
       await supabase.auth.signOut();
       toast.success("Signed out successfully");
@@ -118,20 +127,28 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <div
               className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold"
-              style={{ width: "32px", height: "32px", fontSize: "0.8rem" }}
+              style={{ width: "34px", height: "34px", fontSize: "0.85rem" }}
             >
-              {userEmail ? userEmail.charAt(0).toUpperCase() : "A"}
+              {activeName ? activeName.charAt(0).toUpperCase() : "A"}
             </div>
             <div className="d-none d-md-flex flex-column text-start">
               <span className="fw-semibold text-dark small lh-sm">
-                Super Admin
+                {activeName}
               </span>
-              <span
-                className="text-secondary"
-                style={{ fontSize: "0.7rem", maxWidth: "120px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-              >
-                {userEmail}
-              </span>
+              <div className="d-flex align-items-center gap-1">
+                <span
+                  className="badge bg-primary-subtle text-primary border border-primary-subtle"
+                  style={{ fontSize: "0.65rem", padding: "1px 5px", fontWeight: 600 }}
+                >
+                  {activeRole}
+                </span>
+                <span
+                  className="text-secondary"
+                  style={{ fontSize: "0.7rem", maxWidth: "110px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                >
+                  {activeEmail}
+                </span>
+              </div>
             </div>
             <ChevronDown size={14} className="text-secondary ms-1" />
           </button>
@@ -139,13 +156,18 @@ export const Header: React.FC<HeaderProps> = ({
           {profileOpen && (
             <div
               className="position-absolute end-0 mt-2 bg-white rounded-3 shadow-lg border p-2"
-              style={{ width: "220px", zIndex: 1050 }}
+              style={{ width: "230px", zIndex: 1050 }}
             >
               <div className="px-3 py-2 border-bottom">
-                <p className="fw-bold mb-0 small text-dark">Parijat Society</p>
-                <p className="text-muted small mb-0" style={{ fontSize: "0.75rem" }}>
-                  {userEmail}
-                </p>
+                <p className="fw-bold mb-0 small text-dark">{activeName}</p>
+                <div className="d-flex align-items-center gap-1.5 mt-0.5">
+                  <span className="badge bg-secondary-subtle text-secondary small" style={{ fontSize: "0.65rem" }}>
+                    {activeRole}
+                  </span>
+                  <span className="text-muted small mb-0" style={{ fontSize: "0.72rem" }}>
+                    {activeEmail}
+                  </span>
+                </div>
               </div>
               <button
                 className="dropdown-item d-flex align-items-center gap-2 px-3 py-2 rounded small text-dark mt-1"
@@ -157,16 +179,18 @@ export const Header: React.FC<HeaderProps> = ({
                 <Settings size={15} />
                 <span>Society Settings</span>
               </button>
-              <button
-                className="dropdown-item d-flex align-items-center gap-2 px-3 py-2 rounded small text-dark"
-                onClick={() => {
-                  setProfileOpen(false);
-                  router.push("/users");
-                }}
-              >
-                <User size={15} />
-                <span>Profile & Roles</span>
-              </button>
+              {activeRole !== "Accountant" && (
+                <button
+                  className="dropdown-item d-flex align-items-center gap-2 px-3 py-2 rounded small text-dark"
+                  onClick={() => {
+                    setProfileOpen(false);
+                    router.push("/users");
+                  }}
+                >
+                  <User size={15} />
+                  <span>Profile & Roles</span>
+                </button>
+              )}
               <div className="dropdown-divider my-1" />
               <button
                 className="dropdown-item d-flex align-items-center gap-2 px-3 py-2 rounded small text-danger"

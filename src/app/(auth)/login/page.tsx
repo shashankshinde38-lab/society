@@ -14,10 +14,10 @@ import {
   Mail,
   ShieldCheck,
   CheckCircle2,
-  KeyRound,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { setAdminSession } from "@/features/auth/authActions";
+import { DataStorage } from "@/services/dataStorage";
 import { toast } from "sonner";
 
 const loginSchema = z.object({
@@ -36,30 +36,62 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "admin@gmail.com",
-      password: "admin@123",
-      rememberMe: true,
+      email: "",
+      password: "",
+      rememberMe: false,
     },
   });
 
   const onSubmit = async (data: LoginFormData) => {
     setLoading(true);
     try {
-      // Check master admin credentials
-      if (data.email.trim().toLowerCase() === "admin@gmail.com" && data.password === "admin@123") {
+      const emailTrimmed = data.email.trim().toLowerCase();
+
+      // 1. Check registered Admin Users from DataStorage
+      const registeredUsers = DataStorage.getUsers();
+      const matchedUser = registeredUsers.find(
+        (u) => u.email.toLowerCase() === emailTrimmed
+      );
+
+      if (matchedUser) {
+        if (matchedUser.status === "INACTIVE") {
+          toast.error("This account has been deactivated. Please contact your administrator.");
+          setLoading(false);
+          return;
+        }
+        // Match user's stored password (or initial default admin@123 if untouched)
+        const validPassword = matchedUser.password || "admin@123";
+        if (data.password === validPassword) {
+          DataStorage.updateUser(matchedUser.id, {
+            last_login: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+          });
+          DataStorage.setCurrentUser(matchedUser);
+          await setAdminSession(matchedUser.email);
+          toast.success(`Welcome, ${matchedUser.name}!`);
+          router.push("/dashboard");
+          router.refresh();
+          return;
+        } else {
+          toast.error("Invalid email or password. Please try again.");
+          setLoading(false);
+          return;
+        }
+      }
+
+      // 2. Check default master admin fallback credentials
+      if (emailTrimmed === "admin@gmail.com" && data.password === "admin@123") {
         await setAdminSession("admin@gmail.com");
-        toast.success("Welcome, Super Admin! Redirecting to dashboard...");
+        toast.success("Welcome, Administrator! Redirecting to dashboard...");
         router.push("/dashboard");
         router.refresh();
         return;
       }
 
-      // Supabase Auth verification
+      // 3. Supabase Auth fallback verification
       const supabase = createClient();
       const { data: authData, error } = await supabase.auth.signInWithPassword({
         email: data.email,
@@ -67,7 +99,7 @@ export default function LoginPage() {
       });
 
       if (error) {
-        toast.error(error.message || "Invalid credentials. Please verify your email and password.");
+        toast.error("Invalid email or password. Please try again.");
         setLoading(false);
         return;
       }
@@ -83,12 +115,6 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleFillCredentials = () => {
-    setValue("email", "admin@gmail.com");
-    setValue("password", "admin@123");
-    toast.info("Credentials populated: admin@gmail.com");
   };
 
   return (
@@ -163,34 +189,6 @@ export default function LoginPage() {
               </p>
             </div>
 
-            {/* Default Credentials Helper Card */}
-            <div
-              className="p-3 mb-4 rounded-3 border d-flex align-items-center justify-content-between"
-              style={{ backgroundColor: "#f8fafc" }}
-            >
-              <div className="d-flex align-items-center gap-2">
-                <KeyRound size={18} className="text-primary flex-shrink-0" />
-                <div className="small">
-                  <span className="fw-bold text-dark">Default Admin: </span>
-                  <code className="text-primary bg-white px-1 py-0.5 rounded border">
-                    admin@gmail.com
-                  </code>
-                  <span className="text-secondary mx-1">/</span>
-                  <code className="text-primary bg-white px-1 py-0.5 rounded border">
-                    admin@123
-                  </code>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="btn btn-sm btn-outline-primary py-1 px-2 small"
-                onClick={handleFillCredentials}
-                style={{ fontSize: "0.75rem" }}
-              >
-                Auto Fill
-              </button>
-            </div>
-
             <form onSubmit={handleSubmit(onSubmit)} noValidate>
               {/* Email */}
               <div className="mb-3">
@@ -206,7 +204,7 @@ export default function LoginPage() {
                     {...register("email")}
                     className={`form-control border-start-0 ps-0 ${errors.email ? "is-invalid" : ""
                       }`}
-                    placeholder="admin@gmail.com"
+                    placeholder="name@parijatsociety.org"
                     disabled={loading}
                   />
                   {errors.email && (
@@ -292,10 +290,10 @@ export default function LoginPage() {
 
             <div className="pt-3 border-top text-center">
               <span className="text-secondary small">
-                Society Setup & Configuration:{" "}
-                <Link href="/app-setup" className="text-primary fw-semibold text-decoration-none">
+                {/* Society Setup & Configuration:{" "} */}
+                {/* <Link href="/app-setup" className="text-primary fw-semibold text-decoration-none">
                   App Setup Page
-                </Link>
+                </Link> */}
               </span>
             </div>
           </div>

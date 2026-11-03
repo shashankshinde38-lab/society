@@ -253,23 +253,23 @@ export default function FlatsPage() {
                       <StatusBadge status={flat.status} />
                     </td>
                     <td className="text-end">
-                      <div className="d-inline-flex gap-1">
+                      <div className="action-buttons">
                         <Link
                           href={`/maintenance`}
-                          className="btn btn-sm btn-outline-primary p-1"
+                          className="btn btn-sm btn-outline-primary btn-action-icon"
                           title="View Invoices & Collect Payment"
                         >
                           <CreditCard size={15} />
                         </Link>
                         <button
-                          className="btn btn-sm btn-outline-secondary p-1"
+                          className="btn btn-sm btn-outline-secondary btn-action-icon"
                           onClick={() => handleOpenEdit(flat)}
                           title="Edit Flat"
                         >
                           <Edit2 size={15} />
                         </button>
                         <button
-                          className="btn btn-sm btn-outline-danger p-1"
+                          className="btn btn-sm btn-outline-danger btn-action-icon"
                           onClick={() => handleDelete(flat.id, flat.flat_number)}
                           title="Delete Flat"
                         >

@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/common/PageHeader/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge/StatusBadge";
 import { DataStorage } from "@/services/dataStorage";
 import { Flat, Floor, MaintenanceInvoice, MaintenancePayment } from "@/types/database.types";
+import { AmountInput } from "@/components/common/AmountInput/AmountInput";
 import { formatDate } from "@/utils/dateFormatter";
 import {
   CreditCard,
@@ -25,10 +26,12 @@ import {
   CheckSquare,
   Square,
   Check,
+  Mail,
 } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { openOrDownloadPDF, viewPDFInNewTab } from "@/utils/pdfHelper";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -71,6 +74,8 @@ export default function MaintenancePage() {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [activeReceipt, setActiveReceipt] = useState<MaintenancePayment | null>(null);
   const [receiptFlat, setReceiptFlat] = useState<Flat | null>(null);
+  const [receiptAllocatedMonths, setReceiptAllocatedMonths] = useState<string[]>([]);
+  const [sendingReceiptEmail, setSendingReceiptEmail] = useState(false);
 
   // Full-size Image Preview Modal
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
@@ -146,13 +151,23 @@ export default function MaintenancePage() {
       loadData();
 
       if (selectedFlatForMatrix) {
-        setFlatYearInvoices(DataStorage.getInvoices(selectedFlatForMatrix.id, selectedYear));
+        const invs = DataStorage.getInvoices(selectedFlatForMatrix.id, selectedYear);
+        const unique12 = Array.from(new Map(invs.map((i) => [i.month, i])).values())
+          .sort((a, b) => a.month - b.month)
+          .slice(0, 12);
+        setFlatYearInvoices(unique12);
       }
 
       // Open Receipt for immediate preview & print
       setActiveReceipt(result.payment);
       setReceiptFlat(selectedFlatForPayment);
+      setReceiptAllocatedMonths(result.allocatedMonths);
       setShowReceiptModal(true);
+
+      // Automatically email invoice receipt to resident if email is registered
+      if (selectedFlatForPayment.current_resident?.email) {
+        handleSendReceiptEmail(result.payment, selectedFlatForPayment, result.allocatedMonths);
+      }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Payment recording failed");
     }
@@ -162,7 +177,10 @@ export default function MaintenancePage() {
   const handleOpenMatrix = (flat: Flat) => {
     setSelectedFlatForMatrix(flat);
     const flatInvs = DataStorage.getInvoices(flat.id, selectedYear);
-    setFlatYearInvoices(flatInvs);
+    const unique12 = Array.from(new Map(flatInvs.map((i) => [i.month, i])).values())
+      .sort((a, b) => a.month - b.month)
+      .slice(0, 12);
+    setFlatYearInvoices(unique12);
     setSelectedMonthIds([]);
     setShowMatrixModal(true);
   };
@@ -177,6 +195,7 @@ export default function MaintenancePage() {
   // Select all unpaid / pending months
   const handleSelectAllUnpaidMonths = () => {
     const unpaidIds = flatYearInvoices
+      .slice(0, 12)
       .filter((i) => i.status === "UNPAID" || i.status === "PARTIAL")
       .map((i) => i.id);
     if (unpaidIds.length === 0) {
@@ -188,7 +207,7 @@ export default function MaintenancePage() {
 
   // Select all 12 months
   const handleSelectAllMonths = () => {
-    setSelectedMonthIds(flatYearInvoices.map((i) => i.id));
+    setSelectedMonthIds(flatYearInvoices.slice(0, 12).map((i) => i.id));
   };
 
   // Deselect all
@@ -208,7 +227,10 @@ export default function MaintenancePage() {
     toast.success(`Maintenance dues generated for ${monthNums.length} month(s)`);
     loadData();
     const updated = DataStorage.getInvoices(selectedFlatForMatrix.id, selectedYear);
-    setFlatYearInvoices(updated);
+    const unique12 = Array.from(new Map(updated.map((i) => [i.month, i])).values())
+      .sort((a, b) => a.month - b.month)
+      .slice(0, 12);
+    setFlatYearInvoices(unique12);
   };
 
   // Proceed to Multi-Month Payment Collection
@@ -226,9 +248,8 @@ export default function MaintenancePage() {
     handleOpenCollectPayment(selectedFlatForMatrix, selectedMonthIds, totalSelectedAmt);
   };
 
-  // Generate PDF Receipt
-  const handleDownloadPDFReceipt = () => {
-    if (!activeReceipt || !receiptFlat) return;
+  // Helper to create official PDF Invoice Receipt Document
+  const createReceiptPDFDocument = (receipt: MaintenancePayment, flat: Flat, allocatedMonths?: string[]) => {
     const doc = new jsPDF();
 
     // Society Header Banner
@@ -243,30 +264,33 @@ export default function MaintenancePage() {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.text("Survey No. 42/1, Parijat Enclave, Kothrud, Pune - 411038 | Reg. No: PNE/HSG/2018/8910", 14, 24);
-    doc.text("Email: parijatsociety@gmail.com | Official Maintenance Receipt", 14, 30);
+    doc.text("Email: parijatsociety@gmail.com | Official Maintenance Invoice Receipt", 14, 30);
 
     // Receipt Meta
     doc.setTextColor(30, 41, 59);
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text(`RECEIPT #: ${activeReceipt.receipt_number}`, 14, 48);
+    doc.text(`RECEIPT #: ${receipt.receipt_number}`, 14, 48);
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(`Payment Date: ${activeReceipt.payment_date}`, 145, 48);
+    doc.text(`Payment Date: ${receipt.payment_date}`, 145, 48);
+
+    const paidPeriods = allocatedMonths && allocatedMonths.length > 0 ? allocatedMonths.join(", ") : "Maintenance Cleared";
 
     // Bill Details Table
     autoTable(doc, {
       startY: 55,
       head: [["Description", "Details"]],
       body: [
-        ["Flat Number", `${receiptFlat.flat_number} (${receiptFlat.floor?.floor_name || "Floor"})`],
-        ["Resident Name", receiptFlat.current_resident?.full_name || "Owner/Occupant"],
-        ["Occupancy Type", receiptFlat.current_resident?.resident_type || "OWNER"],
-        ["Payment Method", activeReceipt.payment_method],
-        ["Transaction / Cheque Ref", activeReceipt.transaction_ref || "N/A (Cash Received)"],
-        ["Narration / Remarks", activeReceipt.description || "Regular Maintenance Dues"],
-        ["Total Amount Received", `INR ${Number(activeReceipt.total_amount_received).toLocaleString("en-IN")}.00`],
+        ["Flat Number", `${flat.flat_number} (${flat.floor?.floor_name || "Floor"})`],
+        ["Resident Name", flat.current_resident?.full_name || "Owner/Occupant"],
+        ["Occupancy Type", flat.current_resident?.resident_type || "OWNER"],
+        ["Maintenance Cleared For", paidPeriods],
+        ["Payment Method", receipt.payment_method],
+        ["Transaction / Cheque Ref", receipt.transaction_ref || "N/A (Direct Clearance)"],
+        ["Narration / Remarks", receipt.description || "Regular Maintenance Dues Cleared"],
+        ["Total Amount Received", `INR ${Number(receipt.total_amount_received).toLocaleString("en-IN")}.00`],
       ],
       theme: "striped",
       headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255], fontStyle: "bold" },
@@ -277,10 +301,93 @@ export default function MaintenancePage() {
     const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 30;
     doc.setFontSize(9);
     doc.text("Authorised Signature / Treasurer", 14, finalY);
-    doc.text("Society Stamp", 150, finalY);
+    doc.text("Society Stamp (Verified)", 150, finalY);
 
-    doc.save(`${activeReceipt.receipt_number}_${receiptFlat.flat_number}.pdf`);
-    toast.success("Receipt PDF downloaded successfully!");
+    return doc;
+  };
+
+  // Generate & Download / Open PDF Receipt
+  const handleDownloadPDFReceipt = () => {
+    if (!activeReceipt || !receiptFlat) return;
+    const doc = createReceiptPDFDocument(activeReceipt, receiptFlat, receiptAllocatedMonths);
+    openOrDownloadPDF(doc, `${activeReceipt.receipt_number}_${receiptFlat.flat_number}.pdf`);
+    toast.success("Receipt PDF downloaded / opened successfully!");
+  };
+
+  // Directly view PDF in new tab (native viewer on mobile)
+  const handleViewPDFReceipt = () => {
+    if (!activeReceipt || !receiptFlat) return;
+    const doc = createReceiptPDFDocument(activeReceipt, receiptFlat, receiptAllocatedMonths);
+    viewPDFInNewTab(doc);
+    toast.info("Opening PDF receipt in browser...");
+  };
+
+  // Dispatch Email with attached PDF Invoice Receipt to Resident
+  const handleSendReceiptEmail = async (receipt: MaintenancePayment, flat: Flat, allocatedMonths?: string[]) => {
+    if (!flat.current_resident?.email) {
+      toast.error(`Flat ${flat.flat_number} has no email address. Please update resident contact in Masters.`);
+      return;
+    }
+
+    setSendingReceiptEmail(true);
+    try {
+      const doc = createReceiptPDFDocument(receipt, flat, allocatedMonths);
+      const pdfBase64 = doc.output("datauristring");
+      const currentSoc = DataStorage.getSociety();
+
+      const res = await fetch("/api/mailer/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "PAYMENT_RECEIPT",
+          society: currentSoc,
+          recipients: [
+            {
+              name: flat.current_resident.full_name,
+              email: flat.current_resident.email,
+              flatNumber: flat.flat_number,
+              receiptNumber: receipt.receipt_number,
+              paymentDate: receipt.payment_date,
+              amountPaid: Number(receipt.total_amount_received),
+              paymentMethod: receipt.payment_method,
+              transactionRef: receipt.transaction_ref,
+              paidMonths: allocatedMonths && allocatedMonths.length > 0 ? allocatedMonths : ["Current Month (Cleared)"],
+              description: receipt.description,
+              invoicePdfBase64: pdfBase64,
+            },
+          ],
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.results && data.results.length > 0) {
+        const item = data.results[0];
+        const isSent = item.status === "SENT";
+
+        DataStorage.addEmailLog({
+          recipient_email: flat.current_resident.email,
+          recipient_name: flat.current_resident.full_name,
+          flat_number: flat.flat_number,
+          subject: item.subject || `Maintenance Payment Receipt – ${receipt.receipt_number} – Flat ${flat.flat_number}`,
+          email_type: "PAYMENT_RECEIPT",
+          amount_due: Number(receipt.total_amount_received),
+          status: isSent ? "SENT" : "FAILED",
+          error_message: item.error_message || null,
+        });
+
+        if (isSent) {
+          toast.success(`Maintenance payment receipt & PDF invoice emailed to ${flat.current_resident.email}!`);
+        } else {
+          toast.error(`Receipt email delivery failed: ${item.error_message}`);
+        }
+      } else {
+        toast.error(`Failed to send receipt email: ${data.message || "Unknown error"}`);
+      }
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Error dispatching receipt email");
+    } finally {
+      setSendingReceiptEmail(false);
+    }
   };
 
   // Filtered flats
@@ -322,7 +429,11 @@ export default function MaintenancePage() {
               onChange={(e) => {
                 setSelectedYear(Number(e.target.value));
                 if (selectedFlatForMatrix) {
-                  setFlatYearInvoices(DataStorage.getInvoices(selectedFlatForMatrix.id, Number(e.target.value)));
+                  const invs = DataStorage.getInvoices(selectedFlatForMatrix.id, Number(e.target.value));
+                  const unique12 = Array.from(new Map(invs.map((i) => [i.month, i])).values())
+                    .sort((a, b) => a.month - b.month)
+                    .slice(0, 12);
+                  setFlatYearInvoices(unique12);
                 }
               }}
             >
@@ -489,7 +600,7 @@ export default function MaintenancePage() {
                       return (
                         <tr key={flat.id}>
                           <td className="fw-bold text-dark fs-6">
-                            <div className="d-flex align-items-center gap-2">
+                            <div className="d-flex align-items-center gap-2 flex-wrap">
                               <Building size={16} className="text-primary" />
                               <span>{flat.flat_number}</span>
                             </div>
@@ -540,22 +651,22 @@ export default function MaintenancePage() {
                             />
                           </td>
                           <td className="text-end">
-                            <div className="d-inline-flex gap-2">
+                            <div className="action-buttons">
                               <button
-                                className="btn btn-sm btn-outline-primary py-1 px-2 d-inline-flex align-items-center gap-1"
+                                className="btn btn-sm btn-outline-primary py-1 px-2.5 d-inline-flex align-items-center gap-1.5"
                                 onClick={() => handleOpenMatrix(flat)}
                                 title="View 12-Month Calendar"
                               >
                                 <Calendar size={14} />
-                                <span className="small">12 Months</span>
+                                <span>12 Months</span>
                               </button>
 
                               <button
-                                className="btn btn-sm btn-primary-custom py-1 px-2.5"
+                                className="btn btn-sm btn-primary-custom py-1 px-2.5 d-inline-flex align-items-center gap-1.5"
                                 onClick={() => handleOpenCollectPayment(flat)}
                               >
                                 <DollarSign size={14} />
-                                <span className="small">Collect</span>
+                                <span>Collect</span>
                               </button>
                             </div>
                           </td>
@@ -617,7 +728,7 @@ export default function MaintenancePage() {
                         </td>
                         <td>
                           {p.attachment_url ? (
-                            <div className="d-flex align-items-center gap-2">
+                            <div className="d-flex align-items-center gap-2 flex-wrap">
                               <img
                                 src={p.attachment_url}
                                 alt="Proof"
@@ -740,15 +851,11 @@ export default function MaintenancePage() {
                       <label className="form-label small fw-semibold text-secondary">
                         Amount Received (₹) <span className="text-danger">*</span>
                       </label>
-                      <input
-                        type="number"
-                        className="form-control font-monospace fs-5 fw-bold text-dark no-spinner"
+                      <AmountInput
                         value={paymentAmount}
-                        onChange={(e) =>
-                          setPaymentAmount(e.target.value === "" ? "" : Number(e.target.value))
-                        }
-                        onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                        onChange={(val) => setPaymentAmount(val)}
                         placeholder="e.g. 1100"
+                        className="form-control font-monospace fs-5 fw-bold text-dark"
                         min={1}
                         required
                       />
@@ -859,6 +966,24 @@ export default function MaintenancePage() {
                         </div>
                       )}
                     </div>
+
+                    {/* Automated Email Invoice Notice */}
+                    {selectedFlatForPayment.current_resident?.email ? (
+                      <div className="col-12">
+                        <div className="p-3 bg-success-subtle border border-success-subtle rounded-3 d-flex align-items-center gap-2">
+                          <Check size={16} className="text-success flex-shrink-0" />
+                          <div className="small text-success-emphasis">
+                            <strong>Automated Email Invoice Dispatch:</strong> Upon saving, an official payment receipt email with the generated invoice PDF attached will be dispatched to <strong>{selectedFlatForPayment.current_resident.email}</strong>.
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="col-12">
+                        <div className="p-2.5 bg-light border rounded-3 small text-muted">
+                          ℹ️ No email address registered for this flat. You can download or print the PDF receipt directly after saving.
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -883,14 +1008,15 @@ export default function MaintenancePage() {
 
       {/* 12-Month Calendar Matrix Modal */}
       {showMatrixModal && selectedFlatForMatrix && (() => {
-        const selectedInvs = flatYearInvoices.filter((i) => selectedMonthIds.includes(i.id));
+        const displayedInvoices = flatYearInvoices.slice(0, 12);
+        const selectedInvs = displayedInvoices.filter((i) => selectedMonthIds.includes(i.id));
         const selectedTotalAmt = selectedInvs.reduce(
           (sum, i) => sum + (i.due_amount > 0 ? i.due_amount : i.invoice_amount),
           0
         );
         const unbilledSelectedCount = selectedInvs.filter((i) => i.status === "NO_DUES").length;
         const allSelected =
-          flatYearInvoices.length > 0 && selectedMonthIds.length === flatYearInvoices.length;
+          displayedInvoices.length > 0 && selectedMonthIds.length === displayedInvoices.length;
 
         return (
           <div
@@ -922,7 +1048,7 @@ export default function MaintenancePage() {
                 <div className="modal-body p-4">
                   {/* Calendar Action & Selection Controls Toolbar */}
                   <div className="p-3 bg-light rounded-3 border mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
-                    <div className="d-flex align-items-center gap-2">
+                    <div className="d-flex align-items-center gap-2 flex-wrap">
                       <button
                         type="button"
                         className="btn btn-sm btn-outline-primary btn-tab px-2.5 py-1"
@@ -949,7 +1075,7 @@ export default function MaintenancePage() {
                       )}
                     </div>
 
-                    <div className="d-flex align-items-center gap-2">
+                    <div className="d-flex align-items-center gap-2 flex-wrap">
                       <span className="small text-secondary">
                         <strong className="text-dark">{selectedMonthIds.length}</strong> of 12 Months Selected
                       </span>
@@ -985,7 +1111,7 @@ export default function MaintenancePage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {flatYearInvoices.map((inv) => {
+                        {displayedInvoices.map((inv) => {
                           const isSelected = selectedMonthIds.includes(inv.id);
                           const isPaid = inv.status === "PAID";
 
@@ -1176,7 +1302,7 @@ export default function MaintenancePage() {
                 )}
               </div>
 
-              <div className="p-3 bg-light border-top d-flex justify-content-between">
+              <div className="p-3 bg-light border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <button
                   type="button"
                   className="btn btn-outline-secondary"
@@ -1184,10 +1310,39 @@ export default function MaintenancePage() {
                 >
                   Close
                 </button>
-                <div className="d-flex gap-2">
+                <div className="action-buttons">
+                  {receiptFlat.current_resident?.email && (
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary d-inline-flex align-items-center gap-1.5"
+                      onClick={() => handleSendReceiptEmail(activeReceipt, receiptFlat, receiptAllocatedMonths)}
+                      disabled={sendingReceiptEmail}
+                    >
+                      {sendingReceiptEmail ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm" />
+                          <span>Sending Invoice...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Mail size={15} />
+                          <span>Email Invoice to Resident</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                   <button
                     type="button"
-                    className="btn btn-primary-custom"
+                    className="btn btn-outline-secondary d-inline-flex align-items-center gap-1.5"
+                    onClick={handleViewPDFReceipt}
+                    title="View PDF directly in browser (ideal for mobile)"
+                  >
+                    <Eye size={15} />
+                    <span>View PDF</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary-custom d-inline-flex align-items-center gap-1.5"
                     onClick={handleDownloadPDFReceipt}
                   >
                     <Download size={15} />

@@ -19,23 +19,31 @@ import {
   ChevronDown,
   X,
 } from "lucide-react";
+import { DataStorage } from "@/services/dataStorage";
+import { AdminUser } from "@/types/database.types";
 
 interface SidebarProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
   mobileOpen: boolean;
   onCloseMobile: () => void;
+  currentUser?: AdminUser | null;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   collapsed,
   mobileOpen,
   onCloseMobile,
+  currentUser,
 }) => {
   const pathname = usePathname();
   const [mastersExpanded, setMastersExpanded] = useState(
     pathname.startsWith("/masters")
   );
+
+  const permissions = DataStorage.getUserPermissions(currentUser?.email);
+  const canReadUsers = permissions.users ? permissions.users.read : true;
+  const canReadSetup = permissions.app_setup ? permissions.app_setup.read : true;
 
   const isActive = (path: string) => pathname === path;
   const isMasterActive = pathname.startsWith("/masters");
@@ -211,25 +219,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!collapsed && <span>Mailer</span>}
           </Link>
 
-          <Link
-            href="/users"
-            className={`sidebar-nav-item ${isActive("/users") ? "active" : ""}`}
-            title="Admin Users & Roles"
-            onClick={onCloseMobile}
-          >
-            <ShieldCheck className="nav-icon" />
-            {!collapsed && <span>Admin Users</span>}
-          </Link>
+          {canReadUsers && (
+            <Link
+              href="/users"
+              className={`sidebar-nav-item ${isActive("/users") ? "active" : ""}`}
+              title="Admin Users & Roles"
+              onClick={onCloseMobile}
+            >
+              <ShieldCheck className="nav-icon" />
+              {!collapsed && <span>Admin Users</span>}
+            </Link>
+          )}
 
-          <Link
-            href="/app-setup"
-            className={`sidebar-nav-item ${isActive("/app-setup") ? "active" : ""}`}
-            title="App Setup & Rules"
-            onClick={onCloseMobile}
-          >
-            <Settings2 className="nav-icon" />
-            {!collapsed && <span>App Setup</span>}
-          </Link>
+          {canReadSetup && (
+            <Link
+              href="/app-setup"
+              className={`sidebar-nav-item ${isActive("/app-setup") ? "active" : ""}`}
+              title="App Setup & Rules"
+              onClick={onCloseMobile}
+            >
+              <Settings2 className="nav-icon" />
+              {!collapsed && <span>App Setup</span>}
+            </Link>
+          )}
         </div>
 
         {/* Sidebar Footer info */}
@@ -238,14 +250,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="p-3 border-top border-secondary-subtle"
             style={{ borderColor: "var(--sidebar-border) !important" }}
           >
-            <div className="d-flex align-items-center gap-2">
-              <div
-                className="bg-success rounded-circle"
-                style={{ width: "8px", height: "8px" }}
-              />
-              <span className="text-secondary small" style={{ fontSize: "0.75rem" }}>
-                Supabase Connected
-              </span>
+            <div className="d-flex align-items-center justify-content-between">
+              <div className="d-flex align-items-center gap-2">
+                <div
+                  className="bg-success rounded-circle"
+                  style={{ width: "8px", height: "8px" }}
+                />
+                <span className="text-secondary small" style={{ fontSize: "0.75rem" }}>
+                  {currentUser?.role_name || "Super Admin"} Active
+                </span>
+              </div>
             </div>
           </div>
         )}

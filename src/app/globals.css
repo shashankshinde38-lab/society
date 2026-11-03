@@ -185,7 +185,7 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 1.75rem;
+  padding: 0 clamp(0.75rem, 2vw, 1.75rem);
   position: sticky;
   top: 0;
   z-index: 1030;
@@ -194,7 +194,11 @@ a {
 
 .admin-content {
   flex: 1;
-  padding: 1.75rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: clamp(0.75rem, 2vw, 1.75rem);
+  box-sizing: border-box;
 }
 
 /* Mobile Sidebar Overlay */
@@ -494,5 +498,251 @@ input[type="number"] {
 .stat-card:hover {
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
+}
+
+/* ==========================================================
+   Comprehensive Responsive Architecture (320px – 2560px)
+   ========================================================== */
+
+/* Universal Responsive Table Wrapper Protection */
+.table-responsive {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+  border-radius: inherit;
+  margin-bottom: 0;
+}
+
+.table-responsive::-webkit-scrollbar {
+  height: 6px;
+}
+.table-responsive::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+/* Prevent horizontal bleed on small viewports */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Standardized Button Sizing & Vertical Centering */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.btn-sm {
+  font-size: 0.8125rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  min-height: 32px;
+}
+
+.btn:not(.btn-sm):not(.btn-lg) {
+  min-height: 38px;
+}
+
+/* ==========================================================
+   Global Button Spacing & Action Button Architecture
+   Ensures no buttons touch, overlap or merge anywhere in the app
+   ========================================================== */
+
+/* Universal table action buttons container */
+.action-buttons {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  flex-wrap: nowrap !important;
+  min-width: max-content !important;
+}
+
+.action-buttons-center {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  flex-wrap: nowrap !important;
+  min-width: max-content !important;
+}
+
+.action-buttons button,
+.action-buttons a,
+.action-buttons .btn {
+  flex-shrink: 0 !important;
+  margin: 0 !important;
+}
+
+/* Specific icon action button (e.g. Eye preview, Edit, Delete icons) */
+.btn-action-icon {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  min-height: 32px !important;
+  max-width: 32px !important;
+  max-height: 32px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+  flex-shrink: 0 !important;
+}
+
+/* Toolbar & Header action button groups */
+.toolbar-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 12px !important;
+  flex-wrap: wrap !important;
+}
+
+.page-actions-group {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+}
+
+/* Universal Modal Action Footers */
+.modal-actions,
+.modal-footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 12px !important;
+  flex-wrap: wrap !important;
+}
+
+.modal-footer > * {
+  margin: 0 !important; /* Override Bootstrap default margin on modal footer items */
+}
+
+/* Fallback protection: adjacent buttons without flex container */
+.btn + .btn:not(.btn-group > .btn):not(.action-buttons > .btn):not(.toolbar-actions > .btn):not(.modal-footer > .btn):not(.d-flex > .btn):not(.d-inline-flex > .btn) {
+  margin-left: 8px !important;
+}
+
+/* Responsive Modals */
+.modal-dialog {
+  margin: 1.75rem auto;
+  max-width: min(92vw, 800px);
+}
+
+.modal-dialog.modal-lg {
+  max-width: min(94vw, 920px);
+}
+
+.modal-dialog.modal-xl {
+  max-width: min(96vw, 1140px);
+}
+
+.modal-content {
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Screen Size Specific Breakpoints */
+
+/* 1. Small Mobile (320px – 430px) */
+@media (max-width: 430px) {
+  .admin-header {
+    height: 60px;
+    padding: 0 0.75rem;
+  }
+
+  .admin-content {
+    padding: 0.75rem 0.65rem;
+  }
+
+  /* Page headers stack cleanly */
+  .h3 {
+    font-size: 1.25rem !important;
+  }
+
+  /* Stat cards */
+  .stat-card {
+    padding: 1rem;
+  }
+
+  .stat-value {
+    font-size: 1.35rem !important;
+  }
+
+  .stat-icon-wrapper {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  /* Modal full-bleed on small mobile */
+  .modal-dialog {
+    margin: 0.35rem auto;
+    max-width: calc(100vw - 0.7rem) !important;
+  }
+
+  .modal-content {
+    border-radius: 12px !important;
+  }
+
+  .modal-header,
+  .modal-footer {
+    padding: 0.75rem 1rem !important;
+  }
+
+  .modal-body {
+    padding: 1rem 0.85rem !important;
+  }
+
+  /* Modal footer buttons wrap on tiny screens */
+  .modal-footer {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .modal-footer .btn {
+    flex: 1 1 auto;
+  }
+}
+
+/* 2. Tablet (576px – 1023px) */
+@media (min-width: 576px) and (max-width: 1023.98px) {
+  .admin-content {
+    padding: 1.25rem 1.5rem;
+  }
+
+  .modal-dialog {
+    max-width: 90vw;
+  }
+}
+
+/* 3. Ultra-wide Monitors (1921px – 2560px) */
+@media (min-width: 1921px) {
+  .admin-content {
+    max-width: 2200px;
+    margin: 0 auto;
+    padding: 2.25rem 3rem;
+  }
+
+  .stat-card {
+    padding: 1.75rem 2rem;
+  }
+
+  .stat-value {
+    font-size: 2rem !important;
+  }
 }
 

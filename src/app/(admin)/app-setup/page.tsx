@@ -4,7 +4,8 @@ import React, { useState, useEffect } from "react";
 import { PageHeader } from "@/components/common/PageHeader/PageHeader";
 import { DataStorage } from "@/services/dataStorage";
 import { Society, MaintenanceSettings, MaintenanceRateHistory } from "@/types/database.types";
-import { Building2, Settings2, History, Save, AlertCircle, TrendingUp } from "lucide-react";
+import { AmountInput } from "@/components/common/AmountInput/AmountInput";
+import { Building2, Settings2, History, Save, AlertCircle, TrendingUp, Landmark, QrCode } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AppSetupPage() {
@@ -12,7 +13,7 @@ export default function AppSetupPage() {
   const [settings, setSettings] = useState<MaintenanceSettings | null>(null);
   const [rateHistory, setRateHistory] = useState<MaintenanceRateHistory[]>([]);
 
-  // Society Form
+  // Society Profile Form
   const [socName, setSocName] = useState("");
   const [socAddress, setSocAddress] = useState("");
   const [socCity, setSocCity] = useState("Pune");
@@ -21,16 +22,24 @@ export default function AppSetupPage() {
   const [socEmail, setSocEmail] = useState("");
   const [socPhone, setSocPhone] = useState("");
   const [financialYear, setFinancialYear] = useState("2026-2027");
-  const [openingBalance, setOpeningBalance] = useState<number>(45000);
+  const [openingBalance, setOpeningBalance] = useState<number | "">(45000);
+
+  // Common Bank & UPI Details (Source of Truth for Mailer & Invoices)
+  const [bankName, setBankName] = useState("HDFC Bank");
+  const [accountHolderName, setAccountHolderName] = useState("Parijat Cooperative Housing Society Ltd");
+  const [accountNumber, setAccountNumber] = useState("5020008910291");
+  const [ifscCode, setIfscCode] = useState("HDFC0001234");
+  const [branchName, setBranchName] = useState("Kothrud Branch, Pune");
+  const [upiId, setUpiId] = useState("parijatsociety@okhdfcbank");
 
   // Settings Form
   const [dueDay, setDueDay] = useState<number>(10);
   const [lateFeeEnabled, setLateFeeEnabled] = useState(false);
-  const [lateFeeAmount, setLateFeeAmount] = useState<number>(50);
+  const [lateFeeAmount, setLateFeeAmount] = useState<number | "">(50);
 
   // Rate Change Modal
   const [showRateModal, setShowRateModal] = useState(false);
-  const [newRateAmount, setNewRateAmount] = useState<number>(1300);
+  const [newRateAmount, setNewRateAmount] = useState<number | "">(1300);
   const [rateReason, setRateReason] = useState("");
 
   const loadData = () => {
@@ -50,11 +59,19 @@ export default function AppSetupPage() {
     setSocEmail(s.email);
     setSocPhone(s.contact_number || "");
     setFinancialYear(s.financial_year);
-    setOpeningBalance(s.opening_balance);
+    setOpeningBalance(s.opening_balance !== undefined ? s.opening_balance : "");
+
+    // Load Bank Details from Society
+    setBankName(s.bank_name || "HDFC Bank");
+    setAccountHolderName(s.account_holder_name || "Parijat Cooperative Housing Society Ltd");
+    setAccountNumber(s.account_number || "5020008910291");
+    setIfscCode(s.ifsc_code || "HDFC0001234");
+    setBranchName(s.branch_name || "Kothrud Branch, Pune");
+    setUpiId(s.upi_id || "parijatsociety@okhdfcbank");
 
     setDueDay(st.due_day_of_month);
     setLateFeeEnabled(st.late_fee_enabled);
-    setLateFeeAmount(st.late_fee_amount);
+    setLateFeeAmount(st.late_fee_amount !== undefined ? st.late_fee_amount : "");
   };
 
   useEffect(() => {
@@ -73,9 +90,16 @@ export default function AppSetupPage() {
         email: socEmail,
         contact_number: socPhone,
         financial_year: financialYear,
-        opening_balance: Number(openingBalance),
+        opening_balance: openingBalance === "" ? 0 : Number(openingBalance),
+        // Common single source of truth for bank details
+        bank_name: bankName.trim(),
+        account_holder_name: accountHolderName.trim(),
+        account_number: accountNumber.trim(),
+        ifsc_code: ifscCode.trim(),
+        branch_name: branchName.trim(),
+        upi_id: upiId.trim(),
       });
-      toast.success("Society details updated successfully");
+      toast.success("Society & official bank details updated successfully! Changes reflect automatically in Mailer.");
       loadData();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to update society");
@@ -88,7 +112,7 @@ export default function AppSetupPage() {
       DataStorage.updateSettings({
         due_day_of_month: Number(dueDay),
         late_fee_enabled: lateFeeEnabled,
-        late_fee_amount: Number(lateFeeAmount),
+        late_fee_amount: lateFeeAmount === "" ? 0 : Number(lateFeeAmount),
       });
       toast.success("Maintenance & billing configuration saved");
       loadData();
@@ -99,17 +123,18 @@ export default function AppSetupPage() {
 
   const handleSaveRateChange = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newRateAmount || newRateAmount <= 0) {
+    const rateVal = Number(newRateAmount);
+    if (!newRateAmount || rateVal <= 0) {
       toast.error("Please enter a valid maintenance rate");
       return;
     }
 
     try {
       const rec = DataStorage.addRateChange(
-        Number(newRateAmount),
+        rateVal,
         rateReason || "Annual rate revision approved by General Body"
       );
-      toast.success(`Rate change to ₹${newRateAmount} scheduled for ${rec.effective_from}`);
+      toast.success(`Rate change to ₹${rateVal} scheduled for ${rec.effective_from}`);
       setShowRateModal(false);
       loadData();
     } catch (err: unknown) {
@@ -121,12 +146,12 @@ export default function AppSetupPage() {
     <div>
       <PageHeader
         title="App Setup & Society Configuration"
-        subtitle="Manage society profiles, financial year, maintenance rate schedules, and billing cycles"
+        subtitle="Manage society profiles, bank accounts for email notices, financial year, and maintenance rate rules"
         breadcrumbs={[{ label: "App Setup" }]}
       />
 
       <div className="row g-4 mb-4">
-        {/* Society Profile Form */}
+        {/* Society Profile & Official Bank Details Form */}
         <div className="col-12 col-lg-7">
           <div className="card-premium h-100">
             <div className="card-premium-header">
@@ -239,20 +264,105 @@ export default function AppSetupPage() {
                   <label className="form-label small fw-semibold text-secondary">
                     Opening Balance (₹)
                   </label>
-                  <input
-                    type="number"
-                    className="form-control font-monospace"
+                  <AmountInput
                     value={openingBalance}
-                    onChange={(e) => setOpeningBalance(Number(e.target.value))}
-                    required
+                    onChange={(val) => setOpeningBalance(val)}
+                    placeholder="Enter Opening Balance"
+                    className="form-control font-monospace"
                   />
+                </div>
+              </div>
+
+              {/* Dynamic Bank & Payment Details Section (Single Source of Truth) */}
+              <div className="mt-4 pt-3 border-top">
+                <div className="d-flex align-items-center gap-2 mb-3">
+                  <Landmark size={18} className="text-primary" />
+                  <h6 className="fw-bold text-dark mb-0">Official Society Bank &amp; UPI Details</h6>
+                  <span className="badge bg-primary-subtle text-primary ms-auto">Shared with Mailer &amp; Invoices</span>
+                </div>
+                <div className="small text-secondary mb-3">
+                  These bank details are dynamically embedded into outgoing maintenance emails, reminders, and payment previews.
+                </div>
+
+                <div className="row g-3">
+                  <div className="col-12 col-sm-6">
+                    <label className="form-label small fw-semibold text-secondary">Bank Name</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={bankName}
+                      onChange={(e) => setBankName(e.target.value)}
+                      placeholder="e.g. HDFC Bank"
+                      required
+                    />
+                  </div>
+
+                  <div className="col-12 col-sm-6">
+                    <label className="form-label small fw-semibold text-secondary">Account Holder Name</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={accountHolderName}
+                      onChange={(e) => setAccountHolderName(e.target.value)}
+                      placeholder="e.g. Parijat Cooperative Housing Society Ltd"
+                      required
+                    />
+                  </div>
+
+                  <div className="col-12 col-sm-6">
+                    <label className="form-label small fw-semibold text-secondary">Account Number</label>
+                    <input
+                      type="text"
+                      className="form-control font-monospace"
+                      value={accountNumber}
+                      onChange={(e) => setAccountNumber(e.target.value)}
+                      placeholder="e.g. 5020008910291"
+                      required
+                    />
+                  </div>
+
+                  <div className="col-12 col-sm-6">
+                    <label className="form-label small fw-semibold text-secondary">IFSC Code</label>
+                    <input
+                      type="text"
+                      className="form-control font-monospace text-uppercase"
+                      value={ifscCode}
+                      onChange={(e) => setIfscCode(e.target.value.toUpperCase())}
+                      placeholder="e.g. HDFC0001234"
+                      required
+                    />
+                  </div>
+
+                  <div className="col-12 col-sm-6">
+                    <label className="form-label small fw-semibold text-secondary">Branch Name</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={branchName}
+                      onChange={(e) => setBranchName(e.target.value)}
+                      placeholder="e.g. Kothrud Branch, Pune"
+                      required
+                    />
+                  </div>
+
+                  <div className="col-12 col-sm-6">
+                    <label className="form-label small fw-semibold text-secondary">Society UPI ID (VPA)</label>
+                    <input
+                      type="text"
+                      className="form-control font-monospace"
+                      value={upiId}
+                      onChange={(e) => setUpiId(e.target.value)}
+                      placeholder="e.g. parijatsociety@okhdfcbank"
+                      required
+                    />
+                  </div>
                 </div>
               </div>
 
               <div className="pt-4 border-top mt-4 text-end">
                 <button type="submit" className="btn btn-primary-custom">
                   <Save size={16} />
-                  <span>Update Society Details</span>
+                  <span>Update Society &amp; Bank Details</span>
                 </button>
               </div>
             </form>
@@ -316,11 +426,10 @@ export default function AppSetupPage() {
 
                 <div className="mb-3">
                   <label className="form-label small fw-semibold text-secondary">
-                    Automated Reminder Schedule
+                    Daily 9:00 AM Cron Schedule (Asia/Kolkata)
                   </label>
                   <div className="p-2 bg-light rounded-2 small text-secondary">
-                    Sent automatically on <strong>5th, 10th, 15th, 20th, 25th, and 30th</strong> to
-                    all residents with unpaid dues. (Stops immediately once paid).
+                    Automated maintenance reminders execute <strong>every day at 09:00 AM IST</strong> to all residents with unpaid dues. If a flat has paid its dues, reminders stop immediately.
                   </div>
                 </div>
 
@@ -339,12 +448,11 @@ export default function AppSetupPage() {
                   </div>
                   {lateFeeEnabled && (
                     <div className="mt-2">
-                      <input
-                        type="number"
-                        className="form-control form-control-sm"
-                        placeholder="Fixed surcharge amount in ₹"
+                      <AmountInput
                         value={lateFeeAmount}
-                        onChange={(e) => setLateFeeAmount(Number(e.target.value))}
+                        onChange={(val) => setLateFeeAmount(val)}
+                        placeholder="Fixed surcharge amount in ₹"
+                        className="form-control form-control-sm"
                       />
                     </div>
                   )}
@@ -359,7 +467,7 @@ export default function AppSetupPage() {
         </div>
       </div>
 
-      {/* Maintenance Rate History Table (Strict Requirement) */}
+      {/* Maintenance Rate History Table */}
       <div className="card-premium">
         <div className="card-premium-header">
           <div className="d-flex align-items-center gap-2">
@@ -427,7 +535,6 @@ export default function AppSetupPage() {
 
               <form onSubmit={handleSaveRateChange}>
                 <div className="modal-body p-4">
-                  {/* Warning Info Box */}
                   <div className="alert alert-info d-flex align-items-start gap-2 small mb-3">
                     <AlertCircle size={18} className="text-primary flex-shrink-0 mt-0.5" />
                     <div>
@@ -441,14 +548,12 @@ export default function AppSetupPage() {
                     <label className="form-label small fw-semibold text-secondary">
                       New Monthly Maintenance Rate (₹)
                     </label>
-                    <input
-                      type="number"
-                      className="form-control"
+                    <AmountInput
                       value={newRateAmount}
-                      onChange={(e) => setNewRateAmount(Number(e.target.value))}
+                      onChange={(val) => setNewRateAmount(val)}
+                      placeholder="e.g. 1300"
+                      className="form-control"
                       min={100}
-                      step={50}
-                      required
                     />
                   </div>
 

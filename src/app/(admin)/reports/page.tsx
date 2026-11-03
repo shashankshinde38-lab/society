@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { openOrDownloadPDF } from "@/utils/pdfHelper";
 
 export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<"REPORTS" | "EXCEL_IMPORT">("REPORTS");
@@ -205,7 +206,7 @@ export default function ReportsPage() {
       });
     }
 
-    doc.save(`Parijat_${reportType}_Report.pdf`);
+    openOrDownloadPDF(doc, `Parijat_${reportType}_Report.pdf`);
     toast.success("PDF Report generated!");
   };
 

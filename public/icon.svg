@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="parijatGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="roofGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#60a5fa" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Base Container -->
+  <rect width="32" height="32" rx="7" fill="url(#parijatGrad)" />
+  <rect x="0.5" y="0.5" width="31" height="31" rx="6.5" fill="none" stroke="#60a5fa" stroke-opacity="0.3" stroke-width="1" />
+  
+  <!-- Society Modern High-Rise Building Silhouette -->
+  <!-- Left Wing -->
+  <rect x="6" y="13" width="7" height="13" rx="1" fill="#ffffff" fill-opacity="0.9" />
+  <rect x="8" y="15" width="3" height="2" rx="0.5" fill="#2563eb" />
+  <rect x="8" y="19" width="3" height="2" rx="0.5" fill="#2563eb" />
+  <rect x="8" y="23" width="3" height="3" rx="0.5" fill="#1e40af" />
+  
+  <!-- Main Tower (Center) -->
+  <rect x="14" y="7" width="12" height="19" rx="1.5" fill="#ffffff" />
+  <!-- Spire / Antenna -->
+  <rect x="19" y="4" width="2" height="3" rx="0.5" fill="url(#roofGrad)" />
+  
+  <!-- Main Tower Windows -->
+  <rect x="16" y="9" width="2.5" height="2.5" rx="0.5" fill="#2563eb" />
+  <rect x="21.5" y="9" width="2.5" height="2.5" rx="0.5" fill="#2563eb" />
+  <rect x="16" y="13" width="2.5" height="2.5" rx="0.5" fill="#2563eb" />
+  <rect x="21.5" y="13" width="2.5" height="2.5" rx="0.5" fill="#2563eb" />
+  <rect x="16" y="17" width="2.5" height="2.5" rx="0.5" fill="#2563eb" />
+  <rect x="21.5" y="17" width="2.5" height="2.5" rx="0.5" fill="#2563eb" />
+  
+  <!-- Entrance Grand Arch -->
+  <path d="M18 26V22C18 21.4477 18.4477 21 19 21H21C21.5523 21 22 21.4477 22 22V26H18Z" fill="#1e3a8a" />
+</svg>
+

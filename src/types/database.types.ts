@@ -10,6 +10,14 @@ export interface Society {
   financial_year: string;
   opening_balance: number;
   opening_balance_date: string;
+  // Bank Details for App Setup & Mailer
+  bank_name: string;
+  account_holder_name: string;
+  account_number: string;
+  ifsc_code: string;
+  branch_name: string;
+  upi_id: string;
+  qr_code_url?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -203,13 +211,22 @@ export interface AuditLog {
 
 export interface EmailLog {
   id: string;
+  recipient_id?: string | null;
   recipient_email: string;
   recipient_name: string | null;
+  flat_id?: string | null;
+  flat_number?: string | null;
+  email_type: "DUE_REMINDER" | "PAYMENT_RECEIPT" | "EXPENSE_ALERT" | "GENERAL_ANNOUNCEMENT";
   subject: string;
-  template_type: string;
+  related_maintenance_month?: number | null;
+  related_maintenance_year?: number | null;
+  amount_due?: number | null;
   status: "SENT" | "FAILED" | "PENDING";
-  error_message: string | null;
+  error_message?: string | null;
   sent_at: string;
+  last_attempt?: string | null;
+  next_scheduled_at?: string | null;
+  retry_count?: number;
 }
 
 export interface DashboardMetrics {
@@ -224,4 +241,49 @@ export interface DashboardMetrics {
   previousBalance: number;
   currentWalletBalance: number;
   advanceLiability: number;
+}
+
+// RBAC Permissions System
+export type ModulePermission = {
+  create: boolean;
+  read: boolean;
+  update: boolean;
+  delete: boolean;
+};
+
+export type SystemModuleKey =
+  | "dashboard"
+  | "floors"
+  | "flats"
+  | "residents"
+  | "maintenance"
+  | "payments"
+  | "expenses"
+  | "wallet"
+  | "mailer"
+  | "app_setup"
+  | "reports"
+  | "users"
+  | "roles";
+
+export interface Role {
+  id: string;
+  name: string;
+  description: string | null;
+  is_system: boolean;
+  permissions: Record<SystemModuleKey, ModulePermission>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  password?: string;
+  role_id: string;
+  role_name: string;
+  status: "ACTIVE" | "INACTIVE";
+  last_login: string;
+  created_at: string;
 }

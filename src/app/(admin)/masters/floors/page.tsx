@@ -168,16 +168,16 @@ export default function FloorsPage() {
                       </span>
                     </td>
                     <td className="text-end">
-                      <div className="d-inline-flex gap-1">
+                      <div className="action-buttons">
                         <button
-                          className="btn btn-sm btn-outline-secondary p-1"
+                          className="btn btn-sm btn-outline-secondary btn-action-icon"
                           onClick={() => handleOpenEdit(floor)}
                           title="Edit Floor"
                         >
                           <Edit2 size={15} />
                         </button>
                         <button
-                          className="btn btn-sm btn-outline-danger p-1"
+                          className="btn btn-sm btn-outline-danger btn-action-icon"
                           onClick={() => handleDelete(floor.id, floor.floor_name)}
                           title="Delete Floor"
                         >

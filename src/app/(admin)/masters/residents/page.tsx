@@ -270,16 +270,16 @@ export default function ResidentsPage() {
                         <StatusBadge status="ACTIVE" />
                       </td>
                       <td className="text-end">
-                        <div className="d-inline-flex gap-1">
+                        <div className="action-buttons">
                           <button
-                            className="btn btn-sm btn-outline-warning p-1"
+                            className="btn btn-sm btn-outline-warning btn-action-icon"
                             onClick={() => handleOpenChangeOccupant(res)}
                             title="Change Occupant / Tenant (Preserves History)"
                           >
                             <UserPlus size={15} />
                           </button>
                           <button
-                            className="btn btn-sm btn-outline-secondary p-1"
+                            className="btn btn-sm btn-outline-secondary btn-action-icon"
                             onClick={() => handleOpenHistory(res.flat_id, flat?.flat_number || "")}
                             title="View Occupancy History"
                           >

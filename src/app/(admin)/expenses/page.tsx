@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { PageHeader } from "@/components/common/PageHeader/PageHeader";
 import { DataStorage } from "@/services/dataStorage";
 import { SocietyExpense, ExpenseCategory } from "@/types/database.types";
+import { AmountInput } from "@/components/common/AmountInput/AmountInput";
 import { formatDate } from "@/utils/dateFormatter";
 import {
   Receipt,
@@ -19,6 +20,8 @@ import {
   Image as ImageIcon,
   Eye,
   X,
+  Mail,
+  Send,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -33,13 +36,14 @@ export default function ExpensesPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [amount, setAmount] = useState<number>(1000);
+  const [amount, setAmount] = useState<number | "">("");
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split("T")[0]);
   const [paymentMethod, setPaymentMethod] = useState<"ONLINE" | "CASH" | "CHEQUE">("ONLINE");
   const [vendorName, setVendorName] = useState("");
   const [invoiceBillNo, setInvoiceBillNo] = useState("");
   const [description, setDescription] = useState("");
   const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
+  const [notifyResidents, setNotifyResidents] = useState(true);
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
 
   const loadData = () => {
@@ -54,28 +58,30 @@ export default function ExpensesPage() {
   const handleOpenAdd = () => {
     setTitle("");
     setCategoryId(categories.length > 0 ? categories[0].id : "");
-    setAmount(1000);
+    setAmount("");
     setExpenseDate(new Date().toISOString().split("T")[0]);
     setPaymentMethod("ONLINE");
     setVendorName("");
     setInvoiceBillNo("");
     setDescription("");
     setAttachmentUrl(null);
+    setNotifyResidents(true);
     setShowAddModal(true);
   };
 
-  const handleSaveExpense = (e: React.FormEvent) => {
+  const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || amount <= 0 || !categoryId) {
+    const numAmount = Number(amount);
+    if (!title.trim() || amount === "" || isNaN(numAmount) || numAmount <= 0 || !categoryId) {
       toast.error("Please fill in all required expense fields with a valid amount");
       return;
     }
 
     try {
-      DataStorage.addExpense({
+      const newExp = DataStorage.addExpense({
         category_id: categoryId,
         title: title.trim(),
-        amount: Number(amount),
+        amount: numAmount,
         expense_date: expenseDate,
         payment_method: paymentMethod,
         vendor_name: vendorName.trim() || null,
@@ -85,7 +91,63 @@ export default function ExpensesPage() {
         created_by: "admin@gmail.com",
       });
 
-      toast.success(`Expense ₹${amount} recorded and debited from Society Wallet`);
+      toast.success(`Expense ₹${numAmount.toLocaleString()} recorded and debited from Society Wallet`);
+
+      // Phase 3: Notify registered society residents if enabled
+      if (notifyResidents) {
+        const residents = DataStorage.getResidents().filter((r) => r.is_active && r.email);
+        const cat = categories.find((c) => c.id === categoryId);
+        const society = DataStorage.getSociety();
+
+        if (residents.length > 0) {
+          const recipientPayload = residents.map((r) => ({
+            name: r.full_name,
+            email: r.email,
+            flatNumber: r.flat?.flat_number || "Society Resident",
+          }));
+
+          fetch("/api/mailer/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "EXPENSE_ALERT",
+              recipients: recipientPayload,
+              society,
+              expenseData: {
+                title: title.trim(),
+                category: cat?.name || "General Maintenance",
+                amount: numAmount,
+                expenseDate,
+                vendorName: vendorName.trim() || null,
+                invoiceBillNo: invoiceBillNo.trim() || null,
+                description: description.trim() || null,
+              },
+            }),
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.success && data.results) {
+                data.results.forEach((logItem: any) => {
+                  DataStorage.addEmailLog({
+                    recipient_email: logItem.recipient_email,
+                    recipient_name: logItem.recipient,
+                    flat_number: logItem.flat_number,
+                    subject: logItem.subject,
+                    email_type: "EXPENSE_ALERT",
+                    amount_due: numAmount,
+                    status: logItem.status,
+                    error_message: logItem.error_message,
+                  });
+                });
+                toast.success(`Expenditure notice emailed to ${data.sentCount} society resident(s)`);
+              }
+            })
+            .catch((err) => {
+              console.error("Expense notification dispatch error:", err);
+            });
+        }
+      }
+
       setShowAddModal(false);
       loadData();
     } catch (err: unknown) {
@@ -285,13 +347,15 @@ export default function ExpensesPage() {
                       )}
                     </td>
                     <td className="text-end">
-                      <button
-                        className="btn btn-sm btn-outline-danger p-1"
-                        onClick={() => handleDeleteExpense(exp.id, exp.title, exp.amount)}
-                        title="Delete & Reverse Debit"
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                      <div className="action-buttons">
+                        <button
+                          className="btn btn-sm btn-outline-danger btn-action-icon"
+                          onClick={() => handleDeleteExpense(exp.id, exp.title, exp.amount)}
+                          title="Delete & Reverse Debit"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -334,13 +398,13 @@ export default function ExpensesPage() {
 
                     <div className="col-12 col-sm-4">
                       <label className="form-label small fw-semibold text-secondary">
-                        Amount (₹)
+                        Amount (₹) <span className="text-danger">*</span>
                       </label>
-                      <input
-                        type="number"
-                        className="form-control font-monospace fs-5 fw-bold text-danger"
+                      <AmountInput
                         value={amount}
-                        onChange={(e) => setAmount(Number(e.target.value))}
+                        onChange={(val) => setAmount(val)}
+                        placeholder="e.g. 2500"
+                        className="form-control font-monospace fs-5 fw-bold text-danger"
                         min={1}
                         required
                       />
@@ -466,6 +530,27 @@ export default function ExpensesPage() {
                           </button>
                         </div>
                       )}
+                    </div>
+
+                    {/* Phase 3: Expenditure Email Notification Option */}
+                    <div className="col-12">
+                      <div className="p-3 bg-light rounded-3 border">
+                        <div className="form-check form-switch mb-1">
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            id="notifyResidentsSwitch"
+                            checked={notifyResidents}
+                            onChange={(e) => setNotifyResidents(e.target.checked)}
+                          />
+                          <label className="form-check-label fw-bold text-dark small" htmlFor="notifyResidentsSwitch">
+                            Notify all registered society residents via email (Expenditure Alert)
+                          </label>
+                        </div>
+                        <div className="small text-secondary ps-4">
+                          An official transparency email with expense details, vendor, bill number, and amount will be dispatched to all registered occupants.
+                        </div>
+                      </div>
                     </div>
 
                     <div className="col-12">
