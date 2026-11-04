@@ -5,8 +5,8 @@ import Link from "next/link";
 import { PageHeader } from "@/components/common/PageHeader/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge/StatusBadge";
 import { DataStorage } from "@/services/dataStorage";
-import { Flat, Floor } from "@/types/database.types";
-import { PlusCircle, Search, Edit2, Trash2, Home, CreditCard } from "lucide-react";
+import { Flat, Floor, Resident } from "@/types/database.types";
+import { PlusCircle, Search, Edit2, Trash2, Home, CreditCard, AlertTriangle, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 export default function FlatsPage() {
@@ -24,6 +24,12 @@ export default function FlatsPage() {
   const [flatType, setFlatType] = useState("2BHK");
   const [status, setStatus] = useState<"OCCUPIED" | "VACANT" | "INACTIVE">("OCCUPIED");
   const [description, setDescription] = useState("");
+
+  // Dependency & Delete Confirmation Modal State
+  const [deleteTargetFlat, setDeleteTargetFlat] = useState<Flat | null>(null);
+  const [flatDependencies, setFlatDependencies] = useState<ReturnType<
+    typeof DataStorage.checkFlatDependencies
+  > | null>(null);
 
   const loadData = () => {
     setFlats(DataStorage.getFlats());
@@ -98,15 +104,28 @@ export default function FlatsPage() {
     }
   };
 
-  const handleDelete = (id: string, fNum: string) => {
-    if (confirm(`Are you sure you want to delete flat ${fNum}?`)) {
-      try {
-        DataStorage.deleteFlat(id);
-        toast.success(`Flat ${fNum} deleted`);
-        loadData();
-      } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : "Cannot delete flat");
-      }
+  const handleInitiateDelete = (flat: Flat) => {
+    try {
+      const deps = DataStorage.checkFlatDependencies(flat.id);
+      setDeleteTargetFlat(flat);
+      setFlatDependencies(deps);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to check flat dependencies");
+    }
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteTargetFlat) return;
+    try {
+      DataStorage.deleteFlat(deleteTargetFlat.id);
+      toast.success(
+        `Flat ${deleteTargetFlat.flat_number} deleted. All historical payment records permanently preserved.`
+      );
+      setDeleteTargetFlat(null);
+      setFlatDependencies(null);
+      loadData();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Cannot delete flat");
     }
   };
 
@@ -240,7 +259,8 @@ export default function FlatsPage() {
                       )}
                     </td>
                     <td>
-                      <span className="text-dark">₹1,100 / mo</span>
+                      <span className="text-dark fw-semibold">₹{DataStorage.getFlatMaintenanceRate(flat).toLocaleString()}</span>
+                      <span className="small text-muted"> / mo</span>
                     </td>
                     <td>
                       {(flat.outstanding_dues || 0) > 0 ? (
@@ -270,7 +290,7 @@ export default function FlatsPage() {
                         </button>
                         <button
                           className="btn btn-sm btn-outline-danger btn-action-icon"
-                          onClick={() => handleDelete(flat.id, flat.flat_number)}
+                          onClick={() => handleInitiateDelete(flat)}
                           title="Delete Flat"
                         >
                           <Trash2 size={15} />
@@ -397,6 +417,107 @@ export default function FlatsPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Flat Deletion Dependency & Protection Modal */}
+      {deleteTargetFlat && flatDependencies && (
+        <div
+          className="modal d-block"
+          tabIndex={-1}
+          style={{ backgroundColor: "rgba(15, 23, 42, 0.5)", zIndex: 1060 }}
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow-lg rounded-4">
+              <div className="modal-header border-bottom px-4 pt-4 pb-3">
+                <div className="d-flex align-items-center gap-2">
+                  <div className="p-2 bg-danger-subtle text-danger rounded-circle">
+                    <Trash2 size={20} />
+                  </div>
+                  <div>
+                    <h5 className="modal-title fw-bold text-dark mb-0">
+                      Delete Flat: {deleteTargetFlat.flat_number}
+                    </h5>
+                    <span className="small text-muted">Data dependency &amp; historical ledger check</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    setDeleteTargetFlat(null);
+                    setFlatDependencies(null);
+                  }}
+                />
+              </div>
+
+              <div className="modal-body p-4">
+                <div className="p-3 bg-light rounded-3 border mb-3">
+                  <div className="d-flex align-items-center justify-content-between mb-1">
+                    <span className="fw-bold text-dark fs-6">Flat {deleteTargetFlat.flat_number}</span>
+                    <span className="badge bg-secondary">{deleteTargetFlat.flat_type}</span>
+                  </div>
+                  <div className="small text-secondary">
+                    Floor: <span className="fw-semibold text-dark">{deleteTargetFlat.floor?.floor_name || "—"}</span>
+                  </div>
+                  {flatDependencies.resident ? (
+                    <div className="small text-secondary mt-1">
+                      Current Resident: <span className="fw-semibold text-dark">{flatDependencies.resident.full_name}</span>{" "}
+                      ({flatDependencies.resident.resident_type})
+                    </div>
+                  ) : (
+                    <div className="small text-muted mt-1 fst-italic">Currently Vacant</div>
+                  )}
+                </div>
+
+                {flatDependencies.resident && (
+                  <div className="alert alert-warning d-flex align-items-start gap-2 mb-3">
+                    <AlertTriangle size={18} className="text-warning flex-shrink-0 mt-0.5" />
+                    <div className="small">
+                      <strong>Occupant Notice:</strong> Active resident{" "}
+                      <strong>{flatDependencies.resident.full_name}</strong> will be unassigned and safely archived to resident history.
+                    </div>
+                  </div>
+                )}
+
+                <div className="alert alert-success d-flex align-items-start gap-2 mb-3">
+                  <ShieldCheck size={18} className="text-success flex-shrink-0 mt-0.5" />
+                  <div className="small">
+                    <strong>Financial Records Permanently Preserved:</strong> This flat has{" "}
+                    <strong>{flatDependencies.paidPaymentsCount} paid payment records</strong> totaling{" "}
+                    <strong>₹{flatDependencies.paidPaymentsTotal.toLocaleString()}</strong>.
+                    All payment transaction receipts and ledger entries will remain <strong>permanently intact</strong>.
+                  </div>
+                </div>
+
+                {flatDependencies.unpaidInvoicesCount > 0 && (
+                  <div className="small text-muted mb-0">
+                    {flatDependencies.unpaidInvoicesCount} unpaid pending invoice(s) will be cleared upon flat deletion.
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-footer border-top px-4 py-3 bg-light rounded-bottom-4">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={() => {
+                    setDeleteTargetFlat(null);
+                    setFlatDependencies(null);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger fw-semibold"
+                  onClick={handleConfirmDelete}
+                >
+                  Confirm &amp; Delete Flat
+                </button>
+              </div>
             </div>
           </div>
         </div>

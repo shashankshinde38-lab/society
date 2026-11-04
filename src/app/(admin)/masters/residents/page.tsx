@@ -6,7 +6,8 @@ import { StatusBadge } from "@/components/common/StatusBadge/StatusBadge";
 import { DataStorage } from "@/services/dataStorage";
 import { Resident, Flat, FlatResidentHistory } from "@/types/database.types";
 import { formatDate } from "@/utils/dateFormatter";
-import { PlusCircle, Search, UserCheck, History, Phone, Mail, UserPlus } from "lucide-react";
+import { sanitizeMobileInput, validateMobile, validateEmail } from "@/utils/validation";
+import { PlusCircle, Search, UserCheck, History, Phone, Mail, UserPlus, Trash2, AlertTriangle, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ResidentsPage() {
@@ -22,6 +23,8 @@ export default function ResidentsPage() {
   const [residentType, setResidentType] = useState<"OWNER" | "TENANT">("OWNER");
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
+  const [mobileError, setMobileError] = useState("");
+  const [emailError, setEmailError] = useState("");
 
   // Change Occupant Modal
   const [showChangeModal, setShowChangeModal] = useState(false);
@@ -31,8 +34,13 @@ export default function ResidentsPage() {
   const [newOccupantType, setNewOccupantType] = useState<"OWNER" | "TENANT">("TENANT");
   const [newEmail, setNewEmail] = useState("");
   const [newMobile, setNewMobile] = useState("");
+  const [newMobileError, setNewMobileError] = useState("");
+  const [newEmailError, setNewEmailError] = useState("");
   const [newMoveInDate, setNewMoveInDate] = useState(new Date().toISOString().split("T")[0]);
   const [changeNotes, setChangeNotes] = useState("");
+
+  // Delete Resident State
+  const [deleteConfirmResident, setDeleteConfirmResident] = useState<Resident | null>(null);
 
   // History Modal
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -58,7 +66,26 @@ export default function ResidentsPage() {
     setResidentType("OWNER");
     setEmail("");
     setMobile("");
+    setMobileError("");
+    setEmailError("");
     setShowAddModal(true);
+  };
+
+  const handleMobileChange = (val: string) => {
+    const cleaned = sanitizeMobileInput(val);
+    setMobile(cleaned);
+    const res = validateMobile(cleaned, true);
+    setMobileError(res.isValid ? "" : res.message || "");
+  };
+
+  const handleEmailChange = (val: string) => {
+    setEmail(val);
+    if (!val.trim()) {
+      setEmailError("");
+    } else {
+      const res = validateEmail(val, false);
+      setEmailError(res.isValid ? "" : res.message || "");
+    }
   };
 
   const handleSaveAdd = (e: React.FormEvent) => {
@@ -66,6 +93,22 @@ export default function ResidentsPage() {
     if (!fullName.trim() || !mobile.trim()) {
       toast.error("Please enter resident name and mobile number");
       return;
+    }
+
+    const mobileCheck = validateMobile(mobile, true);
+    if (!mobileCheck.isValid) {
+      toast.error(mobileCheck.message || "Invalid mobile number. Must be exactly 10 digits.");
+      setMobileError(mobileCheck.message || "");
+      return;
+    }
+
+    if (email.trim()) {
+      const emailCheck = validateEmail(email, false);
+      if (!emailCheck.isValid) {
+        toast.error(emailCheck.message || "Invalid email address format.");
+        setEmailError(emailCheck.message || "");
+        return;
+      }
     }
 
     try {
@@ -95,9 +138,28 @@ export default function ResidentsPage() {
     setNewOccupantType(resident.resident_type === "OWNER" ? "TENANT" : "OWNER");
     setNewEmail("");
     setNewMobile("");
+    setNewMobileError("");
+    setNewEmailError("");
     setNewMoveInDate(new Date().toISOString().split("T")[0]);
     setChangeNotes("");
     setShowChangeModal(true);
+  };
+
+  const handleNewMobileChange = (val: string) => {
+    const cleaned = sanitizeMobileInput(val);
+    setNewMobile(cleaned);
+    const res = validateMobile(cleaned, true);
+    setNewMobileError(res.isValid ? "" : res.message || "");
+  };
+
+  const handleNewEmailChange = (val: string) => {
+    setNewEmail(val);
+    if (!val.trim()) {
+      setNewEmailError("");
+    } else {
+      const res = validateEmail(val, false);
+      setNewEmailError(res.isValid ? "" : res.message || "");
+    }
   };
 
   const handleSaveChangeOccupant = (e: React.FormEvent) => {
@@ -105,6 +167,22 @@ export default function ResidentsPage() {
     if (!selectedFlat || !newOccupantName.trim() || !newMobile.trim()) {
       toast.error("Please enter new occupant name and mobile number");
       return;
+    }
+
+    const mobileCheck = validateMobile(newMobile, true);
+    if (!mobileCheck.isValid) {
+      toast.error(mobileCheck.message || "Invalid mobile number. Must be exactly 10 digits.");
+      setNewMobileError(mobileCheck.message || "");
+      return;
+    }
+
+    if (newEmail.trim()) {
+      const emailCheck = validateEmail(newEmail, false);
+      if (!emailCheck.isValid) {
+        toast.error(emailCheck.message || "Invalid email address format.");
+        setNewEmailError(emailCheck.message || "");
+        return;
+      }
     }
 
     try {
@@ -121,6 +199,20 @@ export default function ResidentsPage() {
       loadData();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to change occupant");
+    }
+  };
+
+  const handleConfirmDeleteResident = () => {
+    if (!deleteConfirmResident) return;
+    try {
+      DataStorage.deleteResident(deleteConfirmResident.id);
+      toast.success(
+        `Resident ${deleteConfirmResident.full_name} deleted. All payment transactions and historical records are permanently preserved.`
+      );
+      setDeleteConfirmResident(null);
+      loadData();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete resident");
     }
   };
 
@@ -285,6 +377,13 @@ export default function ResidentsPage() {
                           >
                             <History size={15} />
                           </button>
+                          <button
+                            className="btn btn-sm btn-outline-danger btn-action-icon"
+                            onClick={() => setDeleteConfirmResident(res)}
+                            title="Delete Resident (Preserves Payment Ledger)"
+                          >
+                            <Trash2 size={15} />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -361,16 +460,21 @@ export default function ResidentsPage() {
 
                     <div className="col-12 col-sm-6">
                       <label className="form-label small fw-bold text-dark">
-                        Mobile Number <span className="text-danger">*</span>
+                        Mobile Number (10 Digits) <span className="text-danger">*</span>
                       </label>
                       <input
                         type="tel"
-                        className="form-control"
+                        className={`form-control ${mobileError ? "is-invalid" : mobile.length === 10 ? "is-valid" : ""}`}
                         value={mobile}
-                        onChange={(e) => setMobile(e.target.value)}
-                        placeholder="10-digit mobile (e.g. 9822012345)"
+                        onChange={(e) => handleMobileChange(e.target.value)}
+                        placeholder="e.g. 9822012345"
+                        maxLength={10}
                         required
                       />
+                      {mobileError && <div className="invalid-feedback d-block small">{mobileError}</div>}
+                      {!mobileError && mobile.length === 10 && (
+                        <div className="valid-feedback d-block small text-success">✓ Valid 10-digit mobile number</div>
+                      )}
                     </div>
 
                     <div className="col-12 col-sm-6">
@@ -379,11 +483,12 @@ export default function ResidentsPage() {
                       </label>
                       <input
                         type="email"
-                        className="form-control"
+                        className={`form-control ${emailError ? "is-invalid" : email && !emailError ? "is-valid" : ""}`}
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => handleEmailChange(e.target.value)}
                         placeholder="e.g. resident@gmail.com"
                       />
+                      {emailError && <div className="invalid-feedback d-block small">{emailError}</div>}
                     </div>
 
                     <div className="col-12">
@@ -487,29 +592,35 @@ export default function ResidentsPage() {
 
                     <div className="col-12 col-sm-6">
                       <label className="form-label small fw-semibold text-secondary">
-                        Mobile Number
+                        Mobile Number (10 Digits) <span className="text-danger">*</span>
                       </label>
                       <input
-                        type="text"
-                        className="form-control"
+                        type="tel"
+                        className={`form-control ${newMobileError ? "is-invalid" : newMobile.length === 10 ? "is-valid" : ""}`}
                         value={newMobile}
-                        onChange={(e) => setNewMobile(e.target.value)}
-                        placeholder="10-digit mobile"
+                        onChange={(e) => handleNewMobileChange(e.target.value)}
+                        placeholder="e.g. 9822012345"
+                        maxLength={10}
                         required
                       />
+                      {newMobileError && <div className="invalid-feedback d-block small">{newMobileError}</div>}
+                      {!newMobileError && newMobile.length === 10 && (
+                        <div className="valid-feedback d-block small text-success">✓ Valid 10-digit mobile number</div>
+                      )}
                     </div>
 
                     <div className="col-12 col-sm-6">
                       <label className="form-label small fw-semibold text-secondary">
-                        Email Address
+                        Email Address (Optional)
                       </label>
                       <input
                         type="email"
-                        className="form-control"
+                        className={`form-control ${newEmailError ? "is-invalid" : newEmail && !newEmailError ? "is-valid" : ""}`}
                         value={newEmail}
-                        onChange={(e) => setNewEmail(e.target.value)}
+                        onChange={(e) => handleNewEmailChange(e.target.value)}
                         placeholder="e.g. newresident@gmail.com"
                       />
+                      {newEmailError && <div className="invalid-feedback d-block small">{newEmailError}</div>}
                     </div>
 
                     <div className="col-12 col-sm-6">
@@ -625,6 +736,77 @@ export default function ResidentsPage() {
                   onClick={() => setShowHistoryModal(false)}
                 >
                   Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Resident Delete Confirmation Modal */}
+      {deleteConfirmResident && (
+        <div
+          className="modal d-block"
+          tabIndex={-1}
+          style={{ backgroundColor: "rgba(15, 23, 42, 0.5)", zIndex: 1060 }}
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow-lg rounded-4">
+              <div className="modal-header border-bottom px-4 pt-4 pb-3">
+                <div className="d-flex align-items-center gap-2">
+                  <div className="p-2 bg-danger-subtle text-danger rounded-circle">
+                    <Trash2 size={20} />
+                  </div>
+                  <div>
+                    <h5 className="modal-title fw-bold text-dark mb-0">Delete Resident</h5>
+                    <span className="small text-muted">Confirm deletion of active resident</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setDeleteConfirmResident(null)}
+                />
+              </div>
+
+              <div className="modal-body p-4">
+                <div className="p-3 bg-light rounded-3 border mb-3">
+                  <div className="fw-bold text-dark fs-6">{deleteConfirmResident.full_name}</div>
+                  <div className="small text-secondary mt-1">
+                    Category: <span className="badge bg-secondary ms-1 me-2">{deleteConfirmResident.resident_type}</span>
+                    Mobile: <span className="fw-semibold text-dark">{deleteConfirmResident.mobile}</span>
+                  </div>
+                </div>
+
+                <div className="alert alert-warning d-flex align-items-start gap-2 mb-3">
+                  <AlertTriangle size={18} className="text-warning flex-shrink-0 mt-0.5" />
+                  <div className="small">
+                    <strong>Operational Change:</strong> This resident will be removed from active status and the assigned flat will be set to <strong>VACANT</strong>.
+                  </div>
+                </div>
+
+                <div className="alert alert-success d-flex align-items-start gap-2 mb-0">
+                  <ShieldCheck size={18} className="text-success flex-shrink-0 mt-0.5" />
+                  <div className="small">
+                    <strong>Financial History Protected:</strong> All past maintenance receipts, payment ledger entries, and audit transactions associated with this resident and flat are <strong>permanently preserved</strong> in society accounts.
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer border-top px-4 py-3 bg-light rounded-bottom-4">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={() => setDeleteConfirmResident(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger fw-semibold"
+                  onClick={handleConfirmDeleteResident}
+                >
+                  Confirm &amp; Delete Resident
                 </button>
               </div>
             </div>

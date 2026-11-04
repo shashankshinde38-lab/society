@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { PageHeader } from "@/components/common/PageHeader/PageHeader";
 import { DataStorage } from "@/services/dataStorage";
 import { Floor } from "@/types/database.types";
-import { PlusCircle, Search, Edit2, Trash2, Layers, Building } from "lucide-react";
+import { PlusCircle, Search, Edit2, Trash2, Layers, Building, AlertTriangle, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 export default function FloorsPage() {
@@ -16,6 +16,12 @@ export default function FloorsPage() {
   // Form State
   const [floorNumber, setFloorNumber] = useState<number>(1);
   const [description, setDescription] = useState("");
+
+  // Dependency & Delete Confirmation Modal State
+  const [deleteTargetFloor, setDeleteTargetFloor] = useState<Floor | null>(null);
+  const [floorDependencies, setFloorDependencies] = useState<ReturnType<
+    typeof DataStorage.checkFloorDependencies
+  > | null>(null);
 
   const loadFloors = () => {
     setFloors(DataStorage.getFloors());
@@ -76,15 +82,24 @@ export default function FloorsPage() {
     }
   };
 
-  const handleDelete = (id: string, name: string) => {
-    if (confirm(`Are you sure you want to delete ${name}?`)) {
-      try {
-        DataStorage.deleteFloor(id);
-        toast.success(`${name} deleted successfully`);
-        loadFloors();
-      } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : "Cannot delete floor");
-      }
+  const handleInitiateDelete = (floor: Floor) => {
+    const deps = DataStorage.checkFloorDependencies(floor.id);
+    setDeleteTargetFloor(floor);
+    setFloorDependencies(deps);
+  };
+
+  const handleConfirmDelete = (cascade: boolean) => {
+    if (!deleteTargetFloor) return;
+    try {
+      DataStorage.deleteFloor(deleteTargetFloor.id, cascade);
+      toast.success(
+        `${deleteTargetFloor.floor_name} deleted successfully. All financial records permanently preserved.`
+      );
+      setDeleteTargetFloor(null);
+      setFloorDependencies(null);
+      loadFloors();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Cannot delete floor");
     }
   };
 
@@ -178,7 +193,7 @@ export default function FloorsPage() {
                         </button>
                         <button
                           className="btn btn-sm btn-outline-danger btn-action-icon"
-                          onClick={() => handleDelete(floor.id, floor.floor_name)}
+                          onClick={() => handleInitiateDelete(floor)}
                           title="Delete Floor"
                         >
                           <Trash2 size={15} />
@@ -260,6 +275,129 @@ export default function FloorsPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floor Deletion Dependency & Protection Modal */}
+      {deleteTargetFloor && floorDependencies && (
+        <div
+          className="modal d-block"
+          tabIndex={-1}
+          style={{ backgroundColor: "rgba(15, 23, 42, 0.5)", zIndex: 1060 }}
+        >
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content border-0 shadow-lg rounded-4">
+              <div className="modal-header border-bottom px-4 pt-4 pb-3">
+                <div className="d-flex align-items-center gap-2">
+                  <div className="p-2 bg-danger-subtle text-danger rounded-circle">
+                    <Trash2 size={20} />
+                  </div>
+                  <div>
+                    <h5 className="modal-title fw-bold text-dark mb-0">
+                      Delete Floor: {deleteTargetFloor.floor_name}
+                    </h5>
+                    <span className="small text-muted">Data dependency &amp; historical record check</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    setDeleteTargetFloor(null);
+                    setFloorDependencies(null);
+                  }}
+                />
+              </div>
+
+              <div className="modal-body p-4">
+                {floorDependencies.flatCount > 0 ? (
+                  <div>
+                    <div className="alert alert-warning d-flex align-items-start gap-2 mb-3">
+                      <AlertTriangle size={20} className="text-warning flex-shrink-0 mt-0.5" />
+                      <div>
+                        <strong>Associated Data Detected:</strong> This floor currently contains{" "}
+                        <strong>{floorDependencies.flatCount} flat(s)</strong> and{" "}
+                        <strong>{floorDependencies.residentCount} active resident(s)</strong>.
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-light rounded-3 border mb-3">
+                      <div className="small fw-semibold text-secondary mb-1">ASSOCIATED FLATS ON THIS FLOOR:</div>
+                      <div className="d-flex flex-wrap gap-1 mb-2">
+                        {floorDependencies.flatNumbers.map((num) => (
+                          <span key={num} className="badge bg-white text-dark border">
+                            Flat {num}
+                          </span>
+                        ))}
+                      </div>
+
+                      {floorDependencies.residentNames.length > 0 && (
+                        <div>
+                          <div className="small fw-semibold text-secondary mb-1">ACTIVE RESIDENTS:</div>
+                          <div className="small text-dark fw-medium">
+                            {floorDependencies.residentNames.join(", ")}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="alert alert-success d-flex align-items-start gap-2 mb-3">
+                      <ShieldCheck size={20} className="text-success flex-shrink-0 mt-0.5" />
+                      <div className="small">
+                        <strong>Financial History 100% Protected:</strong> This floor has{" "}
+                        <strong>{floorDependencies.paidPaymentCount} paid payment transactions</strong>{" "}
+                        totaling <strong>₹{floorDependencies.paidPaymentTotal.toLocaleString()}</strong>.
+                        All receipts and financial records are <strong>permanently locked and preserved</strong>.
+                      </div>
+                    </div>
+
+                    <p className="small text-muted mb-0">
+                      If you proceed with cascading deletion, all {floorDependencies.flatCount} flats will be
+                      removed and active residents will be archived. All payment records remain safe in the ledger.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-center py-3">
+                    <p className="text-dark mb-0">
+                      Are you sure you want to delete <strong>{deleteTargetFloor.floor_name}</strong>?
+                    </p>
+                    <p className="small text-muted mb-0">No flats are linked to this floor. This action is safe.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-footer border-top px-4 py-3 bg-light rounded-bottom-4">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={() => {
+                    setDeleteTargetFloor(null);
+                    setFloorDependencies(null);
+                  }}
+                >
+                  Cancel
+                </button>
+
+                {floorDependencies.flatCount > 0 ? (
+                  <button
+                    type="button"
+                    className="btn btn-danger fw-semibold"
+                    onClick={() => handleConfirmDelete(true)}
+                  >
+                    Confirm Cascading Delete ({floorDependencies.flatCount} Flats)
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-danger fw-semibold"
+                    onClick={() => handleConfirmDelete(false)}
+                  >
+                    Delete Floor
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

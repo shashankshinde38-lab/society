@@ -5,7 +5,8 @@ import { PageHeader } from "@/components/common/PageHeader/PageHeader";
 import { DataStorage } from "@/services/dataStorage";
 import { Society, MaintenanceSettings, MaintenanceRateHistory } from "@/types/database.types";
 import { AmountInput } from "@/components/common/AmountInput/AmountInput";
-import { Building2, Settings2, History, Save, AlertCircle, TrendingUp, Landmark, QrCode } from "lucide-react";
+import { sanitizeMobileInput, validateMobile, validateEmail } from "@/utils/validation";
+import { Building2, Settings2, History, Save, AlertCircle, TrendingUp, Landmark, QrCode, ShieldCheck, Users2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AppSetupPage() {
@@ -31,6 +32,10 @@ export default function AppSetupPage() {
   const [ifscCode, setIfscCode] = useState("HDFC0001234");
   const [branchName, setBranchName] = useState("Kothrud Branch, Pune");
   const [upiId, setUpiId] = useState("parijatsociety@okhdfcbank");
+
+  // Separate Owner & Tenant Maintenance Settings
+  const [ownerMonthlyAmount, setOwnerMonthlyAmount] = useState<number | "">(1100);
+  const [tenantMonthlyAmount, setTenantMonthlyAmount] = useState<number | "">(1500);
 
   // Settings Form
   const [dueDay, setDueDay] = useState<number>(10);
@@ -70,6 +75,8 @@ export default function AppSetupPage() {
     setUpiId(s.upi_id || "parijatsociety@okhdfcbank");
 
     setDueDay(st.due_day_of_month);
+    setOwnerMonthlyAmount(st.owner_monthly_amount ?? st.monthly_amount ?? 1100);
+    setTenantMonthlyAmount(st.tenant_monthly_amount ?? 1500);
     setLateFeeEnabled(st.late_fee_enabled);
     setLateFeeAmount(st.late_fee_amount !== undefined ? st.late_fee_amount : "");
   };
@@ -80,15 +87,30 @@ export default function AppSetupPage() {
 
   const handleSaveSociety = (e: React.FormEvent) => {
     e.preventDefault();
+    if (socEmail.trim()) {
+      const emailCheck = validateEmail(socEmail);
+      if (!emailCheck.isValid) {
+        toast.error(emailCheck.message);
+        return;
+      }
+    }
+    if (socPhone.trim()) {
+      const phoneCheck = validateMobile(socPhone);
+      if (!phoneCheck.isValid) {
+        toast.error(phoneCheck.message);
+        return;
+      }
+    }
+
     try {
       DataStorage.updateSociety({
-        name: socName,
-        address: socAddress,
-        city: socCity,
-        state: socState,
-        pincode: socPincode,
-        email: socEmail,
-        contact_number: socPhone,
+        name: socName.trim(),
+        address: socAddress.trim(),
+        city: socCity.trim(),
+        state: socState.trim(),
+        pincode: socPincode.trim(),
+        email: socEmail.trim(),
+        contact_number: socPhone.trim(),
         financial_year: financialYear,
         opening_balance: openingBalance === "" ? 0 : Number(openingBalance),
         // Common single source of truth for bank details
@@ -108,13 +130,27 @@ export default function AppSetupPage() {
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
+    const ownerAmt = Number(ownerMonthlyAmount);
+    const tenantAmt = Number(tenantMonthlyAmount);
+    if (!ownerMonthlyAmount || ownerAmt <= 0) {
+      toast.error("Please enter a valid Owner Maintenance Charge");
+      return;
+    }
+    if (!tenantMonthlyAmount || tenantAmt <= 0) {
+      toast.error("Please enter a valid Tenant Maintenance Charge");
+      return;
+    }
+
     try {
       DataStorage.updateSettings({
         due_day_of_month: Number(dueDay),
+        owner_monthly_amount: ownerAmt,
+        tenant_monthly_amount: tenantAmt,
+        monthly_amount: ownerAmt,
         late_fee_enabled: lateFeeEnabled,
         late_fee_amount: lateFeeAmount === "" ? 0 : Number(lateFeeAmount),
       });
-      toast.success("Maintenance & billing configuration saved");
+      toast.success("Owner & Tenant maintenance charges saved successfully! Applied to all future billing.");
       loadData();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to update settings");
@@ -380,31 +416,67 @@ export default function AppSetupPage() {
             </div>
 
             <div className="p-4">
-              {/* Current Active Rate Card */}
-              <div className="p-3 bg-primary-subtle rounded-3 border border-primary-subtle mb-4">
-                <div className="d-flex align-items-center justify-content-between">
-                  <div>
-                    <span className="small text-secondary fw-semibold">CURRENT MONTHLY RATE</span>
-                    <h2 className="fw-extrabold text-primary mb-0">
-                      ₹{settings?.monthly_amount.toLocaleString() || "1,100"}
-                      <span className="small text-secondary fw-normal fs-6"> / flat / month</span>
-                    </h2>
+              {/* Owner & Tenant Maintenance Rates Display */}
+              <div className="row g-3 mb-4">
+                <div className="col-12 col-sm-6">
+                  <div className="p-3 bg-primary-subtle rounded-3 border border-primary-subtle h-100">
+                    <div className="d-flex align-items-center justify-content-between mb-1">
+                      <span className="badge bg-primary text-white">Owner Flat</span>
+                      <small className="text-muted fw-semibold">Default</small>
+                    </div>
+                    <span className="small text-secondary fw-semibold d-block">OWNER RATE</span>
+                    <h3 className="fw-extrabold text-primary mb-0">
+                      ₹{Number(ownerMonthlyAmount || settings?.owner_monthly_amount || 1100).toLocaleString()}
+                      <span className="small text-secondary fw-normal fs-6"> / mo</span>
+                    </h3>
                   </div>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-primary fw-semibold"
-                    onClick={() => {
-                      setNewRateAmount(settings ? settings.monthly_amount + 200 : 1300);
-                      setRateReason("");
-                      setShowRateModal(true);
-                    }}
-                  >
-                    Change Rate
-                  </button>
+                </div>
+
+                <div className="col-12 col-sm-6">
+                  <div className="p-3 bg-warning-subtle rounded-3 border border-warning-subtle h-100">
+                    <div className="d-flex align-items-center justify-content-between mb-1">
+                      <span className="badge bg-warning text-dark">Tenant Flat</span>
+                      <small className="text-muted fw-semibold">Rented</small>
+                    </div>
+                    <span className="small text-secondary fw-semibold d-block">TENANT RATE</span>
+                    <h3 className="fw-extrabold text-dark mb-0">
+                      ₹{Number(tenantMonthlyAmount || settings?.tenant_monthly_amount || 1500).toLocaleString()}
+                      <span className="small text-secondary fw-normal fs-6"> / mo</span>
+                    </h3>
+                  </div>
                 </div>
               </div>
 
               <form onSubmit={handleSaveSettings}>
+                <div className="row g-3 mb-3">
+                  <div className="col-12 col-sm-6">
+                    <label className="form-label small fw-semibold text-secondary">
+                      Owner Maintenance Charge (₹) <span className="text-danger">*</span>
+                    </label>
+                    <AmountInput
+                      value={ownerMonthlyAmount}
+                      onChange={(val) => setOwnerMonthlyAmount(val)}
+                      placeholder="e.g. 1100"
+                      className="form-control"
+                      min={100}
+                    />
+                    <small className="text-muted">Applied to owner-occupied flats</small>
+                  </div>
+                  <div className="col-12 col-sm-6">
+                    <label className="form-label small fw-semibold text-secondary">
+                      Tenant Maintenance Charge (₹) <span className="text-danger">*</span>
+                    </label>
+                    <AmountInput
+                      value={tenantMonthlyAmount}
+                      onChange={(val) => setTenantMonthlyAmount(val)}
+                      placeholder="e.g. 1500"
+                      className="form-control"
+                      min={100}
+                    />
+                    <small className="text-muted">Applied to tenant-occupied flats</small>
+                  </div>
+                </div>
+
                 <div className="mb-3">
                   <label className="form-label small fw-semibold text-secondary">
                     Maintenance Due Date
@@ -458,8 +530,8 @@ export default function AppSetupPage() {
                   )}
                 </div>
 
-                <button type="submit" className="btn btn-outline-primary w-100 fw-semibold">
-                  Save Billing Rules
+                <button type="submit" className="btn btn-primary w-100 fw-semibold">
+                  Save Maintenance Charges &amp; Billing Rules
                 </button>
               </form>
             </div>

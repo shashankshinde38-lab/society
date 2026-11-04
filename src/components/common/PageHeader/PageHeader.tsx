@@ -21,8 +21,8 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   actions,
 }) => {
   return (
-    <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
-      <div>
+    <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4 min-w-0">
+      <div className="min-w-0">
         {breadcrumbs.length > 0 && (
           <nav aria-label="breadcrumb" className="mb-1">
             <ol className="breadcrumb mb-0 small">
@@ -52,11 +52,15 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
             </ol>
           </nav>
         )}
-        <h1 className="h3 fw-bold text-dark mb-1">{title}</h1>
-        {subtitle && <p className="text-secondary small mb-0">{subtitle}</p>}
+        <h1 className="h3 fw-bold text-dark mb-1 text-break">{title}</h1>
+        {subtitle && <p className="text-secondary small mb-0 text-break">{subtitle}</p>}
       </div>
 
-      {actions && <div className="d-flex align-items-center gap-2 flex-wrap">{actions}</div>}
+      {actions && (
+        <div className="d-flex align-items-center gap-2 flex-wrap min-w-0 w-100 w-md-auto">
+          {actions}
+        </div>
+      )}
     </div>
   );
 };

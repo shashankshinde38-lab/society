@@ -121,12 +121,17 @@ export default function DashboardPage() {
         subtitle="Real-time financial status, wallet liquidity, occupancy distribution, and billing analytics"
         breadcrumbs={[{ label: "Dashboard" }]}
         actions={
-          <div className="d-flex align-items-center gap-2">
-            <div className="d-flex align-items-center gap-2 bg-white px-3 py-2 border rounded-3 shadow-sm">
-              <Calendar size={16} className="text-primary" />
-              <span className="small fw-semibold text-dark">FY 2026–2027 ({currentMonthFull})</span>
+          <div className="d-flex align-items-center gap-2 flex-wrap w-100 w-sm-auto">
+            <div className="d-flex align-items-center gap-1.5 bg-white px-2.5 py-1.5 border rounded-3 shadow-sm flex-grow-1 flex-sm-grow-0">
+              <Calendar size={15} className="text-primary flex-shrink-0" />
+              <span className="small fw-semibold text-dark text-nowrap">
+                FY 2026–27 ({currentMonthShort})
+              </span>
             </div>
-            <Link href="/maintenance" className="btn btn-primary-custom">
+            <Link
+              href="/maintenance"
+              className="btn btn-primary-custom flex-grow-1 flex-sm-grow-0 justify-content-center"
+            >
               <PlusCircle size={16} />
               <span>Collect Payment</span>
             </Link>

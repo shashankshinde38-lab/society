@@ -86,6 +86,8 @@ export interface MaintenanceSettings {
   id: string;
   society_id: string;
   monthly_amount: number;
+  owner_monthly_amount?: number;
+  tenant_monthly_amount?: number;
   due_day_of_month: number;
   currency: string;
   late_fee_enabled: boolean;

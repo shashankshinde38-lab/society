@@ -41,6 +41,8 @@ export const initialSettings: MaintenanceSettings = {
   id: "setting-1",
   society_id: "soc-parijat-a-wing",
   monthly_amount: 1100.0,
+  owner_monthly_amount: 1100.0,
+  tenant_monthly_amount: 1500.0,
   due_day_of_month: 10,
   currency: "INR",
   late_fee_enabled: false,

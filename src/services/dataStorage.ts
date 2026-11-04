@@ -103,7 +103,41 @@ export const DataStorage = {
 
   // --- SETTINGS & RATE HISTORY ---
   getSettings(): MaintenanceSettings {
-    return getStoredItem("settings", initialSettings);
+    const stored = getStoredItem<MaintenanceSettings>("settings", initialSettings);
+    const ownerAmount = stored.owner_monthly_amount ?? stored.monthly_amount ?? 1100;
+    const tenantAmount = stored.tenant_monthly_amount ?? 1500;
+    return {
+      ...initialSettings,
+      ...stored,
+      owner_monthly_amount: ownerAmount,
+      tenant_monthly_amount: tenantAmount,
+      monthly_amount: ownerAmount,
+    };
+  },
+  getFlatMaintenanceRate(flatOrId: Flat | string): number {
+    let flat: Flat | undefined;
+    if (typeof flatOrId === "string") {
+      flat = this.getFlats().find((f) => f.id === flatOrId);
+    } else {
+      flat = flatOrId;
+    }
+    if (!flat) return 1100;
+
+    // 1. Direct flat override takes precedence
+    if (flat.maintenance_override && flat.maintenance_override > 0) {
+      return flat.maintenance_override;
+    }
+
+    // 2. Identify Owner vs Tenant charge
+    const settings = this.getSettings();
+    const ownerRate = settings.owner_monthly_amount ?? settings.monthly_amount ?? 1100;
+    const tenantRate = settings.tenant_monthly_amount ?? 1500;
+
+    const res = flat.current_resident || this.getResidents().find((r) => r.flat_id === flat?.id && r.is_active);
+    if (res && res.resident_type === "TENANT") {
+      return tenantRate;
+    }
+    return ownerRate;
   },
   updateSettings(data: Partial<MaintenanceSettings>): MaintenanceSettings {
     const current = this.getSettings();
@@ -184,12 +218,42 @@ export const DataStorage = {
     setStoredItem("floors", floors);
     return floors[idx];
   },
-  deleteFloor(id: string): void {
-    const flats = this.getFlats();
-    const hasFlats = flats.some((f) => f.floor_id === id);
-    if (hasFlats) {
-      throw new Error("Cannot delete floor with assigned flats. Reassign or delete flats first.");
+  checkFloorDependencies(floorId: string) {
+    const floors = this.getFloors();
+    const floor = floors.find((fl) => fl.id === floorId);
+    const flats = this.getFlats().filter((f) => f.floor_id === floorId);
+    const flatIds = new Set(flats.map((f) => f.id));
+    const residents = this.getResidents().filter((r) => r.is_active && flatIds.has(r.flat_id));
+    const payments = this.getPayments().filter((p) => flatIds.has(p.flat_id));
+    const paidAmount = payments.reduce((sum, p) => sum + Number(p.total_amount_received || 0), 0);
+    const pendingDues = flats.reduce((sum, f) => sum + Number(f.outstanding_dues || 0), 0);
+
+    return {
+      floorName: floor?.floor_name || "Floor",
+      flatCount: flats.length,
+      flatsCount: flats.length,
+      flatNumbers: flats.map((f) => f.flat_number),
+      residentCount: residents.length,
+      residentsCount: residents.length,
+      residentNames: residents.map((r) => r.full_name),
+      paidPaymentCount: payments.length,
+      paidPaymentsCount: payments.length,
+      paidPaymentTotal: paidAmount,
+      paidAmountTotal: paidAmount,
+      pendingDuesTotal: pendingDues,
+    };
+  },
+
+  deleteFloor(id: string, cascade: boolean = false): void {
+    const flats = this.getFlats().filter((f) => f.floor_id === id);
+    if (flats.length > 0 && !cascade) {
+      throw new Error(`Cannot delete floor. It contains ${flats.length} assigned flats.`);
     }
+
+    if (flats.length > 0 && cascade) {
+      flats.forEach((f) => this.deleteFlat(f.id));
+    }
+
     const floors = this.getFloors().filter((f) => f.id !== id);
     setStoredItem("floors", floors);
   },
@@ -247,11 +311,67 @@ export const DataStorage = {
     setStoredItem("flats", flats);
     return flats[idx];
   },
+  checkFlatDependencies(flatId: string) {
+    const flat = this.getFlats().find((f) => f.id === flatId);
+    const resident = flat?.current_resident || this.getResidents().find((r) => r.flat_id === flatId && r.is_active);
+    const payments = this.getPayments().filter((p) => p.flat_id === flatId);
+    const paidAmount = payments.reduce((sum, p) => sum + Number(p.total_amount_received || 0), 0);
+    const invoices = this.getInvoices(flatId);
+    const unpaidInvoices = invoices.filter((i) => i.status === "UNPAID" || i.status === "PARTIAL");
+
+    return {
+      flat: flat!,
+      resident: resident || null,
+      flatNumber: flat?.flat_number || "Flat",
+      floorName: flat?.floor?.floor_name || "Floor",
+      hasActiveResident: Boolean(resident),
+      residentName: resident?.full_name,
+      residentType: resident?.resident_type,
+      paidPaymentsCount: payments.length,
+      paidPaymentsTotal: paidAmount,
+      paidAmountTotal: paidAmount,
+      pendingDuesTotal: flat?.outstanding_dues || 0,
+      unpaidInvoicesCount: unpaidInvoices.length,
+    };
+  },
+
   deleteFlat(id: string): void {
+    const flat = this.getFlats().find((f) => f.id === id);
+    if (!flat) throw new Error("Flat not found");
+
+    // 1. If flat has an active resident, archive to history to permanently preserve history
+    const resident = this.getResidents().find((r) => r.flat_id === id && r.is_active);
+    if (resident) {
+      const history = this.getResidentHistory();
+      history.unshift({
+        id: "hist-" + Date.now(),
+        flat_id: id,
+        resident_name: resident.full_name,
+        resident_type: resident.resident_type,
+        email: resident.email,
+        mobile: resident.mobile,
+        move_in_date: resident.move_in_date,
+        move_out_date: new Date().toISOString().split("T")[0],
+        changed_at: new Date().toISOString(),
+        notes: `Flat ${flat.flat_number} deleted by admin. Resident archived and payments permanently preserved.`,
+      });
+      setStoredItem("resident_history", history);
+
+      // Deactivate resident
+      const residents = this.getResidents().filter((r) => r.id !== resident.id);
+      setStoredItem("residents", residents);
+    }
+
+    // 2. Remove flat from rawFlats
     const rawFlats = getStoredItem<Flat[]>("flats", initialFlats).filter((f) => f.id !== id);
     setStoredItem("flats", rawFlats);
-    const rawInvoices = getStoredItem<MaintenanceInvoice[]>("invoices", []).filter((i) => i.flat_id !== id);
-    setStoredItem("invoices", rawInvoices);
+
+    // 3. Remove only UNPAID/NO_DUES invoices for this flat (preserve any paid invoice records)
+    const rawInvoices = getStoredItem<MaintenanceInvoice[]>("invoices", []);
+    const updatedInvoices = rawInvoices.filter((i) => !(i.flat_id === id && i.status !== "PAID"));
+    setStoredItem("invoices", updatedInvoices);
+
+    // 4. NOTE: Payment transactions in getPayments() are NEVER deleted! They remain permanently.
   },
 
   // --- RESIDENTS & OCCUPANCY HISTORY ---
@@ -353,6 +473,44 @@ export const DataStorage = {
     return { current: newResident, archived: archivedRecord };
   },
 
+  deleteResident(id: string): void {
+    const residents = this.getResidents();
+    const resident = residents.find((r) => r.id === id);
+    if (!resident) throw new Error("Resident not found");
+
+    // 1. Archive to history to permanently preserve historical context
+    const history = this.getResidentHistory();
+    history.unshift({
+      id: "hist-" + Date.now(),
+      flat_id: resident.flat_id,
+      resident_name: resident.full_name,
+      resident_type: resident.resident_type,
+      email: resident.email,
+      mobile: resident.mobile,
+      move_in_date: resident.move_in_date,
+      move_out_date: new Date().toISOString().split("T")[0],
+      changed_at: new Date().toISOString(),
+      notes: `Resident deleted by admin. All historical maintenance payments preserved permanently.`,
+    });
+    setStoredItem("resident_history", history);
+
+    // 2. Remove active resident
+    const updatedResidents = residents.filter((r) => r.id !== id);
+    setStoredItem("residents", updatedResidents);
+
+    // 3. Unassign from flat if currently assigned
+    const rawFlats = getStoredItem<Flat[]>("flats", initialFlats);
+    const flatIdx = rawFlats.findIndex((f) => f.id === resident.flat_id);
+    if (flatIdx !== -1) {
+      rawFlats[flatIdx] = {
+        ...rawFlats[flatIdx],
+        status: "VACANT",
+        updated_at: new Date().toISOString(),
+      };
+      setStoredItem("flats", rawFlats);
+    }
+  },
+
   seedStarterResidents(): void {
     const existingFlats = this.getFlats();
     if (existingFlats.length > 0) return;
@@ -441,7 +599,7 @@ export const DataStorage = {
         const key = `${flat.id}_${year}_${m}`;
         if (!invoiceMap.has(key)) {
           addedMissing = true;
-          const amt = flat.maintenance_override || defaultRate;
+          const amt = this.getFlatMaintenanceRate(flat);
           invoiceMap.set(key, {
             id: `inv-${flat.id}-${year}-${m}`,
             flat_id: flat.id,
@@ -487,7 +645,7 @@ export const DataStorage = {
     const invoices = this.getInvoices();
     const flats = this.getFlats();
     const flat = flats.find((f) => f.id === flatId);
-    const monthlyAmt = customAmount || flat?.maintenance_override || this.getSettings().monthly_amount || 1100;
+    const monthlyAmt = customAmount || (flat ? this.getFlatMaintenanceRate(flat) : 1100);
 
     months.forEach((m) => {
       const existing = invoices.find((inv) => inv.flat_id === flatId && inv.year === year && inv.month === m);
@@ -565,7 +723,7 @@ export const DataStorage = {
       // If any selected invoice is in NO_DUES status, activate it for payment
       targetInvoices.forEach((inv) => {
         if (inv.status === "NO_DUES" || inv.due_amount === 0) {
-          const amt = inv.invoice_amount || flat.maintenance_override || 1100;
+          const amt = inv.invoice_amount || this.getFlatMaintenanceRate(flat);
           inv.status = "UNPAID";
           inv.invoice_amount = amt;
           inv.due_amount = amt;

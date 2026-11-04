@@ -57,12 +57,15 @@
   padding: 0;
 }
 
+html,
 body {
   font-family: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background-color: var(--bg-app);
   color: var(--text-primary);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 a {
@@ -78,6 +81,12 @@ a {
   min-height: 100vh;
   background-color: var(--bg-app);
   overflow-x: hidden;
+  max-width: 100vw;
+}
+
+.admin-main {
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 /* Sidebar */

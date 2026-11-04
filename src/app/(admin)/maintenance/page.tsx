@@ -187,6 +187,11 @@ export default function MaintenancePage() {
 
   // Toggle Single Month Selection in 12-Month Calendar
   const handleToggleMonthSelection = (invId: string) => {
+    const inv = flatYearInvoices.find((i) => i.id === invId);
+    if (inv && (inv.status === "PAID" || inv.status === "ADVANCE_COVERED")) {
+      toast.info("This month is already paid and cannot be selected again.");
+      return;
+    }
     setSelectedMonthIds((prev) =>
       prev.includes(invId) ? prev.filter((id) => id !== invId) : [...prev, invId]
     );
@@ -196,18 +201,26 @@ export default function MaintenancePage() {
   const handleSelectAllUnpaidMonths = () => {
     const unpaidIds = flatYearInvoices
       .slice(0, 12)
-      .filter((i) => i.status === "UNPAID" || i.status === "PARTIAL")
+      .filter((i) => i.status !== "PAID" && i.status !== "ADVANCE_COVERED")
       .map((i) => i.id);
     if (unpaidIds.length === 0) {
-      toast.info("No unpaid months found for this year");
+      toast.info("No unpaid months found for this year. All months are settled!");
       return;
     }
     setSelectedMonthIds(unpaidIds);
   };
 
-  // Select all 12 months
-  const handleSelectAllMonths = () => {
-    setSelectedMonthIds(flatYearInvoices.slice(0, 12).map((i) => i.id));
+  // Select all payable months (excludes already-paid months)
+  const handleSelectAllPayableMonths = () => {
+    const payableIds = flatYearInvoices
+      .slice(0, 12)
+      .filter((i) => i.status !== "PAID" && i.status !== "ADVANCE_COVERED")
+      .map((i) => i.id);
+    if (payableIds.length === 0) {
+      toast.info("All months are already paid for this flat.");
+      return;
+    }
+    setSelectedMonthIds(payableIds);
   };
 
   // Deselect all
@@ -239,9 +252,10 @@ export default function MaintenancePage() {
       toast.error("Please select at least one month to collect payment");
       return;
     }
+    const flatRate = DataStorage.getFlatMaintenanceRate(selectedFlatForMatrix);
     const selectedInvs = flatYearInvoices.filter((i) => selectedMonthIds.includes(i.id));
     const totalSelectedAmt = selectedInvs.reduce(
-      (sum, i) => sum + (i.due_amount > 0 ? i.due_amount : i.invoice_amount),
+      (sum, i) => sum + (i.due_amount > 0 ? i.due_amount : (i.invoice_amount || flatRate)),
       0
     );
     setShowMatrixModal(false);
@@ -625,7 +639,7 @@ export default function MaintenancePage() {
                             </span>
                           </td>
                           <td className="fw-semibold text-dark">
-                            ₹{(flat.maintenance_override || 1100).toLocaleString()}
+                            ₹{DataStorage.getFlatMaintenanceRate(flat).toLocaleString()}
                           </td>
                           <td>
                             {!isClear ? (
@@ -651,24 +665,14 @@ export default function MaintenancePage() {
                             />
                           </td>
                           <td className="text-end">
-                            <div className="action-buttons">
-                              <button
-                                className="btn btn-sm btn-outline-primary py-1 px-2.5 d-inline-flex align-items-center gap-1.5"
-                                onClick={() => handleOpenMatrix(flat)}
-                                title="View 12-Month Calendar"
-                              >
-                                <Calendar size={14} />
-                                <span>12 Months</span>
-                              </button>
-
-                              <button
-                                className="btn btn-sm btn-primary-custom py-1 px-2.5 d-inline-flex align-items-center gap-1.5"
-                                onClick={() => handleOpenCollectPayment(flat)}
-                              >
-                                <DollarSign size={14} />
-                                <span>Collect</span>
-                              </button>
-                            </div>
+                            <button
+                              className="btn btn-sm btn-primary-custom py-1.5 px-3 d-inline-flex align-items-center gap-1.5 fw-semibold"
+                              onClick={() => handleOpenMatrix(flat)}
+                              title="Annual Maintenance Collection & 12-Month Ledger"
+                            >
+                              <Calendar size={14} />
+                              <span>Annual Maintenance Collection</span>
+                            </button>
                           </td>
                         </tr>
                       );
@@ -818,7 +822,10 @@ export default function MaintenancePage() {
                     <div className="col-sm-6 text-sm-end">
                       <span className="small text-secondary">Society Maintenance Rate:</span>
                       <div className="fw-bold text-primary fs-6">
-                        ₹{(selectedFlatForPayment.maintenance_override || 1100).toLocaleString()} / month
+                        ₹{DataStorage.getFlatMaintenanceRate(selectedFlatForPayment).toLocaleString()} / month
+                      </div>
+                      <div className="small text-muted">
+                        Category: <span className="fw-semibold text-dark">{selectedFlatForPayment.current_resident?.resident_type || "OWNER"}</span>
                       </div>
                       {Number(selectedFlatForPayment.advance_balance || 0) > 0 && (
                         <span className="badge bg-purple-subtle text-primary border mt-1">
@@ -1006,17 +1013,28 @@ export default function MaintenancePage() {
         </div>
       )}
 
-      {/* 12-Month Calendar Matrix Modal */}
+      {/* Annual Maintenance Collection Modal */}
       {showMatrixModal && selectedFlatForMatrix && (() => {
         const displayedInvoices = flatYearInvoices.slice(0, 12);
+        const flatRate = DataStorage.getFlatMaintenanceRate(selectedFlatForMatrix);
+        const residentType = selectedFlatForMatrix.current_resident?.resident_type || "OWNER";
+        const isTenant = residentType === "TENANT";
+
+        const payableInvoices = displayedInvoices.filter(
+          (i) => i.status !== "PAID" && i.status !== "ADVANCE_COVERED"
+        );
         const selectedInvs = displayedInvoices.filter((i) => selectedMonthIds.includes(i.id));
         const selectedTotalAmt = selectedInvs.reduce(
-          (sum, i) => sum + (i.due_amount > 0 ? i.due_amount : i.invoice_amount),
+          (sum, i) => sum + (i.due_amount > 0 ? i.due_amount : (i.invoice_amount || flatRate)),
           0
         );
+        const totalPaidYear = displayedInvoices.reduce((sum, i) => sum + Number(i.paid_amount || 0), 0);
+        const totalDueYear = displayedInvoices.reduce((sum, i) => sum + Number(i.due_amount || 0), 0);
+        const annualRateTotal = flatRate * 12;
         const unbilledSelectedCount = selectedInvs.filter((i) => i.status === "NO_DUES").length;
-        const allSelected =
-          displayedInvoices.length > 0 && selectedMonthIds.length === displayedInvoices.length;
+        const allPayableSelected =
+          payableInvoices.length > 0 &&
+          payableInvoices.every((i) => selectedMonthIds.includes(i.id));
 
         return (
           <div
@@ -1028,15 +1046,28 @@ export default function MaintenancePage() {
               <div className="modal-content border-0 shadow-lg rounded-4">
                 <div className="modal-header border-bottom px-4 pt-4 pb-3">
                   <div>
-                    <h5 className="modal-title fw-bold text-dark mb-0">
-                      12-Month Maintenance Calendar &mdash; Flat {selectedFlatForMatrix.flat_number} ({selectedYear})
-                    </h5>
-                    <div className="small text-muted mt-0.5">
+                    <div className="d-flex align-items-center gap-2 flex-wrap mb-1">
+                      <h5 className="modal-title fw-bold text-dark mb-0">
+                        Annual Maintenance Collection &mdash; Flat {selectedFlatForMatrix.flat_number} ({selectedYear})
+                      </h5>
+                      {isTenant ? (
+                        <span className="badge bg-warning text-dark border fw-bold">
+                          TENANT OCCUPIED (Rate: ₹{flatRate.toLocaleString()} / mo)
+                        </span>
+                      ) : (
+                        <span className="badge bg-primary text-white border fw-bold">
+                          OWNER OCCUPIED (Rate: ₹{flatRate.toLocaleString()} / mo)
+                        </span>
+                      )}
+                    </div>
+                    <div className="small text-muted">
                       Resident: <strong className="text-dark">{selectedFlatForMatrix.current_resident?.full_name || "Owner"}</strong> | Floor:{" "}
-                      {selectedFlatForMatrix.floor?.floor_name || "1st Floor"} | Base Rate:{" "}
-                      <strong className="text-primary">₹{(selectedFlatForMatrix.maintenance_override || 1100).toLocaleString()} / month</strong>
+                      {selectedFlatForMatrix.floor?.floor_name || "Floor"} | Annual Maintenance:{" "}
+                      <strong className="text-dark">₹{annualRateTotal.toLocaleString()}</strong> | Paid:{" "}
+                      <strong className="text-success">₹{totalPaidYear.toLocaleString()}</strong> | Pending Due:{" "}
+                      <strong className={totalDueYear > 0 ? "text-danger" : "text-muted"}>₹{totalDueYear.toLocaleString()}</strong>
                       {Number(selectedFlatForMatrix.advance_balance || 0) > 0 && (
-                        <span className="ms-2 badge bg-success-subtle text-success border">
+                        <span className="ms-2 badge bg-purple-subtle text-primary border">
                           Advance Pool: ₹{Number(selectedFlatForMatrix.advance_balance).toLocaleString()}
                         </span>
                       )}
@@ -1055,14 +1086,15 @@ export default function MaintenancePage() {
                         onClick={handleSelectAllUnpaidMonths}
                       >
                         <CheckSquare size={14} className="me-1 text-primary" />
-                        Select All Unpaid Months
+                        Select All Pending Months ({payableInvoices.length})
                       </button>
                       <button
                         type="button"
                         className="btn btn-sm btn-outline-secondary btn-tab px-2.5 py-1"
-                        onClick={handleSelectAllMonths}
+                        onClick={handleSelectAllPayableMonths}
+                        disabled={payableInvoices.length === 0}
                       >
-                        Select All (12 Months)
+                        Select All Payable Months
                       </button>
                       {selectedMonthIds.length > 0 && (
                         <button
@@ -1077,11 +1109,11 @@ export default function MaintenancePage() {
 
                     <div className="d-flex align-items-center gap-2 flex-wrap">
                       <span className="small text-secondary">
-                        <strong className="text-dark">{selectedMonthIds.length}</strong> of 12 Months Selected
+                        <strong className="text-dark">{selectedMonthIds.length}</strong> month(s) selected
                       </span>
                       {selectedMonthIds.length > 0 && (
                         <span className="badge bg-primary fs-6 px-3 py-1">
-                          Total: ₹{selectedTotalAmt.toLocaleString()}
+                          Payable Total: ₹{selectedTotalAmt.toLocaleString()}
                         </span>
                       )}
                     </div>
@@ -1092,14 +1124,20 @@ export default function MaintenancePage() {
                     <table className="table table-bordered table-premium align-middle mb-0">
                       <thead>
                         <tr>
-                          <th className="text-center" style={{ width: "44px" }}>
-                            <input
-                              type="checkbox"
-                              className="form-check-input cursor-pointer"
-                              checked={allSelected}
-                              onChange={() => (allSelected ? handleDeselectAllMonths() : handleSelectAllMonths())}
-                              title="Toggle Select All"
-                            />
+                          <th className="text-center" style={{ width: "90px" }}>
+                            {payableInvoices.length > 0 ? (
+                              <input
+                                type="checkbox"
+                                className="form-check-input cursor-pointer"
+                                checked={allPayableSelected}
+                                onChange={() =>
+                                  allPayableSelected ? handleDeselectAllMonths() : handleSelectAllPayableMonths()
+                                }
+                                title="Toggle Select All Payable Months"
+                              />
+                            ) : (
+                              <span className="small text-muted">Status</span>
+                            )}
                           </th>
                           <th>Month</th>
                           <th>Maintenance Rate</th>
@@ -1113,28 +1151,37 @@ export default function MaintenancePage() {
                       <tbody>
                         {displayedInvoices.map((inv) => {
                           const isSelected = selectedMonthIds.includes(inv.id);
-                          const isPaid = inv.status === "PAID";
+                          const isPaid = inv.status === "PAID" || inv.status === "ADVANCE_COVERED";
 
                           return (
                             <tr key={inv.id} className={isSelected ? "table-primary bg-primary-subtle" : ""}>
                               <td className="text-center">
-                                <input
-                                  type="checkbox"
-                                  className="form-check-input cursor-pointer"
-                                  checked={isSelected}
-                                  onChange={() => handleToggleMonthSelection(inv.id)}
-                                />
+                                {isPaid ? (
+                                  <span
+                                    className="badge bg-success-subtle text-success border py-1 px-1.5"
+                                    title="Already paid - excluded from duplicate collection"
+                                  >
+                                    <Check size={14} className="text-success" />
+                                  </span>
+                                ) : (
+                                  <input
+                                    type="checkbox"
+                                    className="form-check-input cursor-pointer"
+                                    checked={isSelected}
+                                    onChange={() => handleToggleMonthSelection(inv.id)}
+                                  />
+                                )}
                               </td>
                               <td className="fw-bold text-dark">{MONTH_NAMES[inv.month - 1]}</td>
-                              <td className="fw-semibold">₹{inv.invoice_amount.toLocaleString()}</td>
+                              <td className="fw-semibold">₹{(inv.invoice_amount || flatRate).toLocaleString()}</td>
                               <td>
                                 <StatusBadge
                                   status={inv.status}
                                   label={
                                     inv.status === "NO_DUES"
-                                      ? "NO DUES"
+                                      ? "PENDING BILL"
                                       : inv.status === "UNPAID"
-                                      ? "PENDING"
+                                      ? "UNPAID"
                                       : inv.status === "PARTIAL"
                                       ? "PARTIALLY PAID"
                                       : inv.status === "PAID"
@@ -1143,26 +1190,19 @@ export default function MaintenancePage() {
                                   }
                                 />
                               </td>
-                              <td className="text-success fw-semibold">₹{inv.paid_amount.toLocaleString()}</td>
-                              <td className={inv.due_amount > 0 ? "text-danger fw-bold" : "text-muted"}>
-                                ₹{inv.due_amount.toLocaleString()}
+                              <td className="text-success fw-semibold">₹{Number(inv.paid_amount || 0).toLocaleString()}</td>
+                              <td className={Number(inv.due_amount || 0) > 0 ? "text-danger fw-bold" : "text-muted"}>
+                                ₹{Number(inv.due_amount || (inv.status === "NO_DUES" ? flatRate : 0)).toLocaleString()}
                               </td>
                               <td className="small text-secondary">{formatDate(inv.due_date)}</td>
                               <td className="text-end">
                                 {!isPaid ? (
                                   <button
                                     type="button"
-                                    className="btn btn-sm btn-outline-primary py-0 px-2 small"
-                                    onClick={() => {
-                                      setShowMatrixModal(false);
-                                      handleOpenCollectPayment(
-                                        selectedFlatForMatrix,
-                                        [inv.id],
-                                        inv.due_amount > 0 ? inv.due_amount : inv.invoice_amount
-                                      );
-                                    }}
+                                    className={`btn btn-sm ${isSelected ? "btn-primary" : "btn-outline-primary"} py-0 px-2 small`}
+                                    onClick={() => handleToggleMonthSelection(inv.id)}
                                   >
-                                    Pay Month
+                                    {isSelected ? "Selected" : "Select"}
                                   </button>
                                 ) : (
                                   <span className="text-success small fw-semibold d-inline-flex align-items-center gap-1">
