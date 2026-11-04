@@ -34,6 +34,7 @@ import {
   initialAdminUsers,
   initialEmailLogs,
 } from "./mockInitialData";
+import { getValidDueDate } from "@/utils/dateFormatter";
 
 const STORAGE_KEY_PREFIX = "parijat_erp_v6_";
 
@@ -91,7 +92,7 @@ function generateYearlyInvoices(flats: Flat[], year: number = 2026, monthlyAmt: 
         paid_amount: 0,
         due_amount: 0, // Starts at 0 until maintenance dues are generated
         status: "NO_DUES", // Default status for new flat: No Dues
-        due_date: `${year}-${String(m).padStart(2, "0")}-10`,
+        due_date: getValidDueDate(year, m, 10),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });
@@ -645,7 +646,45 @@ export const DataStorage = {
   },
 
   // --- INVOICES & MAINTENANCE CALENDAR ---
-  getInvoices(flatId?: string, year: number = 2026): MaintenanceInvoice[] {
+  /**
+   * Automatically determines the active maintenance year for a flat:
+   * - Starts from current calendar year (or society base year 2026).
+   * - Checks whether December of that year is completed (status === 'PAID' or 'ADVANCE_COVERED').
+   * - If December is completed, automatically rolls forward to the next year (e.g. 2027).
+   * - Enables progressive annual collection: once December 2026 is completed,
+   *   January to December 2027 is automatically displayed for all 12 months.
+   */
+  getFlatActiveMaintenanceYear(flatId?: string, baseYear: number = 2026): number {
+    const calendarYear = typeof window !== "undefined" ? new Date().getFullYear() : 2026;
+    let year = Math.max(baseYear, calendarYear);
+
+    if (!flatId) return year;
+
+    const rawInvoices = getStoredItem<MaintenanceInvoice[]>("invoices", []);
+
+    while (true) {
+      const decInv = rawInvoices.find(
+        (i) => i.flat_id === flatId && i.year === year && i.month === 12
+      );
+
+      const isDecCompleted =
+        decInv &&
+        (decInv.status === "PAID" ||
+          decInv.status === "ADVANCE_COVERED" ||
+          (Number(decInv.due_amount || 0) === 0 && Number(decInv.paid_amount || 0) > 0));
+
+      if (isDecCompleted) {
+        year++;
+      } else {
+        break;
+      }
+    }
+
+    return year;
+  },
+
+  getInvoices(flatId?: string, year?: number): MaintenanceInvoice[] {
+    const resolvedYear = year || (flatId ? this.getFlatActiveMaintenanceYear(flatId) : (typeof window !== "undefined" ? new Date().getFullYear() : 2026));
     const rawInvoices = getStoredItem<MaintenanceInvoice[]>("invoices", []);
     const flats = getStoredItem<Flat[]>("flats", initialFlats);
     const settings = this.getSettings();
@@ -680,20 +719,20 @@ export const DataStorage = {
     for (const flat of flats) {
       const currentRate = this.getFlatMaintenanceRate(flat);
       for (let m = 1; m <= 12; m++) {
-        const key = `${flat.id}_${year}_${m}`;
+        const key = `${flat.id}_${resolvedYear}_${m}`;
         if (!invoiceMap.has(key)) {
           addedMissing = true;
           invoiceMap.set(key, {
-            id: `inv-${flat.id}-${year}-${m}`,
+            id: `inv-${flat.id}-${resolvedYear}-${m}`,
             flat_id: flat.id,
             resident_id: flat.current_resident?.id || null,
             month: m,
-            year,
+            year: resolvedYear,
             invoice_amount: currentRate,
             paid_amount: 0,
             due_amount: 0,
             status: "NO_DUES",
-            due_date: `${year}-${String(m).padStart(2, "0")}-10`,
+            due_date: getValidDueDate(resolvedYear, m, settings.due_day_of_month || 10),
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           });
@@ -723,7 +762,7 @@ export const DataStorage = {
     // 4. If flatId requested, return sorted exactly 12 months (month 1 to 12)
     if (flatId) {
       return cleanInvoices
-        .filter((i) => i.flat_id === flatId && i.year === year)
+        .filter((i) => i.flat_id === flatId && i.year === resolvedYear)
         .sort((a, b) => a.month - b.month)
         .slice(0, 12);
     }

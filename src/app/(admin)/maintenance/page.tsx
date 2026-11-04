@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/common/StatusBadge/StatusBadge";
 import { DataStorage } from "@/services/dataStorage";
 import { Flat, Floor, MaintenanceInvoice, MaintenancePayment } from "@/types/database.types";
 import { AmountInput } from "@/components/common/AmountInput/AmountInput";
-import { formatDate } from "@/utils/dateFormatter";
+import { formatDate, isLeapYear, validateDateInput } from "@/utils/dateFormatter";
 import {
   CreditCard,
   Search,
@@ -54,7 +54,9 @@ export default function MaintenancePage() {
   const [floorFilter, setFloorFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
-  const [selectedYear, setSelectedYear] = useState<number>(2026);
+  const [selectedYear, setSelectedYear] = useState<number>(() => {
+    return typeof window !== "undefined" ? new Date().getFullYear() : 2026;
+  });
 
   // Collect Payment Modal
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -171,6 +173,13 @@ export default function MaintenancePage() {
       return;
     }
 
+    // Strict leap year & date validation
+    const dateCheck = validateDateInput(paymentDate);
+    if (!dateCheck.isValid) {
+      toast.error(dateCheck.message || "Invalid payment date entered");
+      return;
+    }
+
     try {
       const result = DataStorage.recordPayment({
         flatId: selectedFlatForPayment.id,
@@ -196,7 +205,13 @@ export default function MaintenancePage() {
       loadData();
 
       if (selectedFlatForMatrix) {
-        const invs = DataStorage.getInvoices(selectedFlatForMatrix.id, selectedYear);
+        // Automatically advance to next year if December was completed
+        const nextActiveYear = DataStorage.getFlatActiveMaintenanceYear(selectedFlatForMatrix.id);
+        if (nextActiveYear !== selectedYear) {
+          setSelectedYear(nextActiveYear);
+          toast.success(`December ${selectedYear} completed! Automatically advanced to ${nextActiveYear} calendar cycle.`);
+        }
+        const invs = DataStorage.getInvoices(selectedFlatForMatrix.id, nextActiveYear);
         const unique12 = Array.from(new Map(invs.map((i) => [i.month, i])).values())
           .sort((a, b) => a.month - b.month)
           .slice(0, 12);
@@ -218,10 +233,12 @@ export default function MaintenancePage() {
     }
   };
 
-  // Open 12-Month Matrix
+  // Open Annual Maintenance Collection Matrix (auto-identifies active or advanced year)
   const handleOpenMatrix = (flat: Flat) => {
     setSelectedFlatForMatrix(flat);
-    const flatInvs = DataStorage.getInvoices(flat.id, selectedYear);
+    const autoYear = DataStorage.getFlatActiveMaintenanceYear(flat.id);
+    setSelectedYear(autoYear);
+    const flatInvs = DataStorage.getInvoices(flat.id, autoYear);
     const unique12 = Array.from(new Map(flatInvs.map((i) => [i.month, i])).values())
       .sort((a, b) => a.month - b.month)
       .slice(0, 12);
@@ -482,24 +499,19 @@ export default function MaintenancePage() {
         breadcrumbs={[{ label: "Maintenance" }]}
         actions={
           <div className="d-flex align-items-center gap-2">
-            <select
-              className="form-select form-select-sm bg-white"
-              value={selectedYear}
-              onChange={(e) => {
-                setSelectedYear(Number(e.target.value));
-                if (selectedFlatForMatrix) {
-                  const invs = DataStorage.getInvoices(selectedFlatForMatrix.id, Number(e.target.value));
-                  const unique12 = Array.from(new Map(invs.map((i) => [i.month, i])).values())
-                    .sort((a, b) => a.month - b.month)
-                    .slice(0, 12);
-                  setFlatYearInvoices(unique12);
-                }
-              }}
-            >
-              <option value={2025}>FY 2025</option>
-              <option value={2026}>FY 2026</option>
-              <option value={2027}>FY 2027</option>
-            </select>
+            <div className="badge bg-white text-dark border px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm">
+              <Calendar size={14} className="text-primary" />
+              <span>Active Cycle: {selectedYear}</span>
+              {isLeapYear(selectedYear) ? (
+                <span className="badge bg-primary-subtle text-primary border ms-1 py-0 px-1.5 small">
+                  Leap Year (29 Feb)
+                </span>
+              ) : (
+                <span className="badge bg-light text-muted border ms-1 py-0 px-1.5 small">
+                  28 Feb
+                </span>
+              )}
+            </div>
           </div>
         }
       />
@@ -1103,6 +1115,15 @@ export default function MaintenancePage() {
                       <h5 className="modal-title fw-bold text-dark mb-0">
                         Annual Maintenance Collection &mdash; Flat {selectedFlatForMatrix.flat_number} ({selectedYear})
                       </h5>
+                      {isLeapYear(selectedYear) ? (
+                        <span className="badge bg-info text-dark border fw-bold">
+                          Leap Year ({selectedYear}) &bull; Feb 29 Days
+                        </span>
+                      ) : (
+                        <span className="badge bg-light text-secondary border">
+                          {selectedYear} &bull; Feb 28 Days
+                        </span>
+                      )}
                       {isTenant ? (
                         <span className="badge bg-warning text-dark border fw-bold">
                           TENANT OCCUPIED (Rate: ₹{flatRate.toLocaleString()} / mo)
@@ -1234,7 +1255,22 @@ export default function MaintenancePage() {
                                   />
                                 )}
                               </td>
-                              <td className="fw-bold text-dark">{MONTH_NAMES[inv.month - 1]}</td>
+                              <td className="fw-bold text-dark">
+                                <div className="d-flex align-items-center gap-2">
+                                  <span>{MONTH_NAMES[inv.month - 1]}</span>
+                                  {inv.month === 2 && (
+                                    isLeapYear(inv.year) ? (
+                                      <span className="badge bg-primary-subtle text-primary border py-0 px-1.5 small fw-normal">
+                                        Leap Year (29 days)
+                                      </span>
+                                    ) : (
+                                      <span className="badge bg-light text-muted border py-0 px-1.5 small fw-normal">
+                                        28 days
+                                      </span>
+                                    )
+                                  )}
+                                </div>
+                              </td>
                               <td className="fw-semibold">₹{(inv.invoice_amount || flatRate).toLocaleString()}</td>
                               <td>
                                 <StatusBadge

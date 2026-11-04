@@ -99,12 +99,17 @@ export const Header: React.FC<HeaderProps> = ({
             style={{ width: "7px", height: "7px" }}
           />
           <span className="small fw-semibold text-secondary" style={{ fontSize: "0.75rem" }}>
-            FY 2026–2027
+            {(() => {
+              const d = new Date();
+              const y = d.getFullYear();
+              const m = d.getMonth() + 1;
+              return m >= 4 ? `FY ${y}–${y + 1}` : `FY ${y - 1}–${y}`;
+            })()}
           </span>
         </div>
 
         {/* Notification Icon */}
-        <button
+        {/* <button
           className="btn btn-light position-relative p-2 rounded-circle border"
           aria-label="Notifications"
           onClick={() => toast.info("No unread alerts")}
@@ -116,7 +121,7 @@ export const Header: React.FC<HeaderProps> = ({
           >
             2
           </span>
-        </button>
+        </button> */}
 
         {/* Profile Dropdown */}
         <div className="position-relative">
