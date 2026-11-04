@@ -27,6 +27,8 @@ import {
   Square,
   Check,
   Mail,
+  Edit2,
+  Settings2,
 } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
@@ -80,6 +82,11 @@ export default function MaintenancePage() {
   // Full-size Image Preview Modal
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
 
+  // Set Flat Maintenance Rate Modal
+  const [showSetRateModal, setShowSetRateModal] = useState(false);
+  const [targetFlatForRate, setTargetFlatForRate] = useState<Flat | null>(null);
+  const [rateInputValue, setRateInputValue] = useState<number | "">(1500);
+
   const loadData = () => {
     setFlats(DataStorage.getFlats());
     setFloors(DataStorage.getFloors());
@@ -90,6 +97,44 @@ export default function MaintenancePage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleOpenSetRateModal = (flat: Flat) => {
+    const currentRate = DataStorage.getFlatMaintenanceRate(flat);
+    setTargetFlatForRate(flat);
+    setRateInputValue(currentRate);
+    setShowSetRateModal(true);
+  };
+
+  const handleSaveFlatRate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetFlatForRate || !rateInputValue || Number(rateInputValue) <= 0) {
+      toast.error("Please enter a valid monthly maintenance rate");
+      return;
+    }
+
+    try {
+      DataStorage.setFlatMaintenanceRate(targetFlatForRate.id, Number(rateInputValue));
+      toast.success(
+        `Flat ${targetFlatForRate.flat_number} maintenance rate updated to ₹${Number(rateInputValue).toLocaleString()}/month and all invoices synchronized!`
+      );
+      setShowSetRateModal(false);
+      loadData();
+
+      // If matrix modal is open for this flat, reload its 12-month records
+      if (selectedFlatForMatrix && selectedFlatForMatrix.id === targetFlatForRate.id) {
+        const updatedFlats = DataStorage.getFlats();
+        const updatedFlat = updatedFlats.find((f) => f.id === targetFlatForRate.id) || targetFlatForRate;
+        setSelectedFlatForMatrix(updatedFlat);
+        const invs = DataStorage.getInvoices(updatedFlat.id, selectedYear);
+        const unique12 = Array.from(new Map(invs.map((i) => [i.month, i])).values())
+          .sort((a, b) => a.month - b.month)
+          .slice(0, 12);
+        setFlatYearInvoices(unique12);
+      }
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to update maintenance rate");
+    }
+  };
 
   // Open Payment Form (Supports single flat or pre-selected multi-month collection)
   const handleOpenCollectPayment = (
@@ -635,8 +680,22 @@ export default function MaintenancePage() {
                               {flat.current_resident?.resident_type || "N/A"}
                             </span>
                           </td>
-                          <td className="fw-semibold text-dark">
-                            ₹{DataStorage.getFlatMaintenanceRate(flat).toLocaleString()}
+                          <td>
+                            <div className="d-flex align-items-center gap-1.5">
+                              <span className="fw-semibold text-dark">
+                                ₹{DataStorage.getFlatMaintenanceRate(flat).toLocaleString()}
+                              </span>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-secondary py-0 px-1.5 rounded-pill"
+                                style={{ fontSize: "0.72rem" }}
+                                onClick={() => handleOpenSetRateModal(flat)}
+                                title="Set / Override Monthly Maintenance Rate for this flat"
+                              >
+                                <Edit2 size={11} className="me-0.5" />
+                                Set Rate
+                              </button>
+                            </div>
                           </td>
                           <td>
                             {!isClear ? (
@@ -1056,6 +1115,15 @@ export default function MaintenancePage() {
                           OWNER OCCUPIED (Rate: ₹{flatRate.toLocaleString()} / mo)
                         </span>
                       )}
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-secondary py-0.5 px-2 small fw-semibold"
+                        onClick={() => handleOpenSetRateModal(selectedFlatForMatrix)}
+                        title="Set or Override Monthly Maintenance Rate"
+                      >
+                        <Edit2 size={12} className="me-1" />
+                        Set Rate
+                      </button>
                     </div>
                     <div className="small text-muted">
                       Resident: <strong className="text-dark">{selectedFlatForMatrix.current_resident?.full_name || "Owner"}</strong> | Floor:{" "}
@@ -1426,6 +1494,149 @@ export default function MaintenancePage() {
           </div>
         </div>
       )}
+
+      {/* Set Flat Maintenance Rate Modal */}
+      {showSetRateModal && targetFlatForRate && (() => {
+        const settings = DataStorage.getSettings();
+        const ownerRate = settings.owner_monthly_amount || 1100;
+        const tenantRate = settings.tenant_monthly_amount || 1500;
+        const resident = targetFlatForRate.current_resident;
+        const isTenant = resident?.resident_type === "TENANT";
+
+        return (
+          <div
+            className="modal d-block"
+            tabIndex={-1}
+            style={{ backgroundColor: "rgba(15, 23, 42, 0.5)", zIndex: 1070 }}
+          >
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content border-0 shadow-lg rounded-4">
+                <div className="modal-header border-bottom px-4 pt-4 pb-3">
+                  <div className="d-flex align-items-center gap-2">
+                    <div className="p-2 bg-primary-subtle text-primary rounded-circle">
+                      <Settings2 size={20} />
+                    </div>
+                    <div>
+                      <h5 className="modal-title fw-bold text-dark mb-0">
+                        Set Maintenance Rate &mdash; Flat {targetFlatForRate.flat_number}
+                      </h5>
+                      <span className="small text-muted">
+                        Configure custom or standard monthly maintenance for this flat
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => setShowSetRateModal(false)}
+                  />
+                </div>
+
+                <form onSubmit={handleSaveFlatRate}>
+                  <div className="modal-body p-4">
+                    <div className="p-3 bg-light rounded-3 border mb-3">
+                      <div className="d-flex align-items-center justify-content-between mb-1">
+                        <span className="fw-bold text-dark fs-6">
+                          Flat {targetFlatForRate.flat_number} ({targetFlatForRate.floor?.floor_name || "Floor"})
+                        </span>
+                        {resident ? (
+                          <span
+                            className={`badge ${
+                              isTenant
+                                ? "bg-warning text-dark border"
+                                : "bg-primary text-white"
+                            }`}
+                          >
+                            {resident.resident_type}
+                          </span>
+                        ) : (
+                          <span className="badge bg-secondary">VACANT</span>
+                        )}
+                      </div>
+                      <div className="small text-secondary">
+                        Occupant:{" "}
+                        <strong className="text-dark">
+                          {resident?.full_name || "No active resident (Vacant)"}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {/* Quick Preset Buttons */}
+                    <div className="mb-3">
+                      <label className="form-label small fw-semibold text-secondary d-block">
+                        Quick Rate Presets
+                      </label>
+                      <div className="d-flex gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          className={`btn btn-sm ${
+                            Number(rateInputValue) === tenantRate
+                              ? "btn-warning text-dark fw-bold"
+                              : "btn-outline-secondary"
+                          }`}
+                          onClick={() => setRateInputValue(tenantRate)}
+                        >
+                          Tenant Rate (₹{tenantRate.toLocaleString()})
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn btn-sm ${
+                            Number(rateInputValue) === ownerRate
+                              ? "btn-primary fw-bold"
+                              : "btn-outline-secondary"
+                          }`}
+                          onClick={() => setRateInputValue(ownerRate)}
+                        >
+                          Owner Rate (₹{ownerRate.toLocaleString()})
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mb-3">
+                      <label className="form-label small fw-bold text-dark">
+                        Monthly Maintenance Amount (₹) <span className="text-danger">*</span>
+                      </label>
+                      <AmountInput
+                        value={rateInputValue}
+                        onChange={(val) => setRateInputValue(val)}
+                        placeholder="e.g. 1500"
+                        className="form-control fs-5 font-monospace fw-bold"
+                        min={100}
+                        required
+                      />
+                      <small className="text-muted">
+                        Applied to this flat&apos;s monthly billing cycles.
+                      </small>
+                    </div>
+
+                    <div className="alert alert-info small d-flex align-items-start gap-2 mb-0">
+                      <AlertCircle size={16} className="text-primary flex-shrink-0 mt-0.5" />
+                      <div>
+                        <strong>Automatic Synchronization:</strong> Updating this rate automatically
+                        re-calculates all unbilled and pending dues for Flat {targetFlatForRate.flat_number}.
+                        Historical paid receipts remain permanently locked.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="modal-footer border-top px-4 py-3 bg-light rounded-bottom-4">
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary"
+                      onClick={() => setShowSetRateModal(false)}
+                    >
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn btn-primary-custom">
+                      Save &amp; Update Flat Maintenance
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

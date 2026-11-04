@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/common/PageHeader/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge/StatusBadge";
 import { DataStorage } from "@/services/dataStorage";
 import { Flat, Floor, Resident } from "@/types/database.types";
+import { AmountInput } from "@/components/common/AmountInput/AmountInput";
 import { PlusCircle, Search, Edit2, Trash2, Home, CreditCard, AlertTriangle, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,6 +24,7 @@ export default function FlatsPage() {
   const [floorId, setFloorId] = useState("");
   const [flatType, setFlatType] = useState("2BHK");
   const [status, setStatus] = useState<"OCCUPIED" | "VACANT" | "INACTIVE">("OCCUPIED");
+  const [maintenanceOverride, setMaintenanceOverride] = useState<number | "">("");
   const [description, setDescription] = useState("");
 
   // Dependency & Delete Confirmation Modal State
@@ -50,6 +52,7 @@ export default function FlatsPage() {
     setFloorId(floors[0].id);
     setFlatType("2BHK");
     setStatus("OCCUPIED");
+    setMaintenanceOverride("");
     setDescription("");
     setShowModal(true);
   };
@@ -60,6 +63,7 @@ export default function FlatsPage() {
     setFloorId(flat.floor_id);
     setFlatType(flat.flat_type || "2BHK");
     setStatus(flat.status);
+    setMaintenanceOverride(flat.maintenance_override || DataStorage.getFlatMaintenanceRate(flat));
     setDescription(flat.description || "");
     setShowModal(true);
   };
@@ -76,22 +80,26 @@ export default function FlatsPage() {
     }
 
     try {
+      const overrideVal =
+        maintenanceOverride && Number(maintenanceOverride) > 0 ? Number(maintenanceOverride) : null;
+
       if (editingFlat) {
         DataStorage.updateFlat(editingFlat.id, {
           flat_number: flatNumber.toUpperCase().trim(),
           floor_id: floorId,
           flat_type: flatType,
           status,
+          maintenance_override: overrideVal,
           description,
         });
-        toast.success(`Flat ${flatNumber} updated successfully`);
+        toast.success(`Flat ${flatNumber} updated successfully with maintenance rate ₹${overrideVal || "Standard"}`);
       } else {
         DataStorage.addFlat({
           flat_number: flatNumber.toUpperCase().trim(),
           floor_id: floorId,
           flat_type: flatType,
           area_sqft: 0,
-          maintenance_override: null,
+          maintenance_override: overrideVal,
           status,
           description,
         });
@@ -387,6 +395,22 @@ export default function FlatsPage() {
                         <option value="VACANT">VACANT</option>
                         <option value="INACTIVE">INACTIVE</option>
                       </select>
+                    </div>
+
+                    <div className="col-12 col-sm-6">
+                      <label className="form-label small fw-semibold text-secondary">
+                        Monthly Maintenance Rate (₹)
+                      </label>
+                      <AmountInput
+                        value={maintenanceOverride}
+                        onChange={(val) => setMaintenanceOverride(val)}
+                        placeholder="Standard rate applied if empty"
+                        className="form-control"
+                        min={100}
+                      />
+                      <small className="text-muted">
+                        Custom override for this flat (e.g. ₹1,500 for tenant)
+                      </small>
                     </div>
 
                     <div className="col-12">

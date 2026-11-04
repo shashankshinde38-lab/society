@@ -304,12 +304,57 @@ export const DataStorage = {
     return newFlat;
   },
   updateFlat(id: string, data: Partial<Flat>): Flat {
-    const flats = this.getFlats();
-    const idx = flats.findIndex((f) => f.id === id);
+    const rawFlats = getStoredItem<Flat[]>("flats", initialFlats);
+    const idx = rawFlats.findIndex((f) => f.id === id);
     if (idx === -1) throw new Error("Flat not found");
-    flats[idx] = { ...flats[idx], ...data, updated_at: new Date().toISOString() };
-    setStoredItem("flats", flats);
-    return flats[idx];
+    rawFlats[idx] = { ...rawFlats[idx], ...data, updated_at: new Date().toISOString() };
+    setStoredItem("flats", rawFlats);
+
+    if (data.maintenance_override !== undefined) {
+      this.syncFlatInvoicesRate(id);
+    }
+    return this.getFlats().find((f) => f.id === id)!;
+  },
+
+  setFlatMaintenanceRate(flatId: string, rate: number | null): void {
+    const rawFlats = getStoredItem<Flat[]>("flats", initialFlats);
+    const idx = rawFlats.findIndex((f) => f.id === flatId);
+    if (idx === -1) throw new Error("Flat not found");
+    rawFlats[idx].maintenance_override = rate && rate > 0 ? rate : null;
+    rawFlats[idx].updated_at = new Date().toISOString();
+    setStoredItem("flats", rawFlats);
+
+    this.syncFlatInvoicesRate(flatId);
+  },
+
+  syncFlatInvoicesRate(flatId: string): void {
+    const flat = this.getFlats().find((f) => f.id === flatId);
+    if (!flat) return;
+    const currentRate = this.getFlatMaintenanceRate(flat);
+    const invoices = getStoredItem<MaintenanceInvoice[]>("invoices", []);
+    let modified = false;
+
+    invoices.forEach((inv) => {
+      if (inv.flat_id === flatId) {
+        if (inv.status === "NO_DUES") {
+          inv.invoice_amount = currentRate;
+          inv.due_amount = 0;
+          modified = true;
+        } else if (inv.status === "UNPAID") {
+          inv.invoice_amount = currentRate;
+          inv.due_amount = currentRate;
+          modified = true;
+        } else if (inv.status === "PARTIAL") {
+          inv.invoice_amount = currentRate;
+          inv.due_amount = Math.max(0, currentRate - Number(inv.paid_amount || 0));
+          modified = true;
+        }
+      }
+    });
+
+    if (modified) {
+      setStoredItem("invoices", invoices);
+    }
   },
   checkFlatDependencies(flatId: string) {
     const flat = this.getFlats().find((f) => f.id === flatId);
@@ -383,10 +428,17 @@ export const DataStorage = {
     if (flatId) return history.filter((h) => h.flat_id === flatId);
     return history;
   },
-  addResident(data: Omit<Resident, "id" | "is_active" | "created_at" | "updated_at">): Resident {
+  addResident(data: Omit<Resident, "id" | "is_active" | "created_at" | "updated_at"> & { monthly_rate?: number }): Resident {
     const residents = this.getResidents();
     const newResident: Resident = {
-      ...data,
+      flat_id: data.flat_id,
+      full_name: data.full_name,
+      resident_type: data.resident_type,
+      email: data.email,
+      mobile: data.mobile,
+      alternate_mobile: data.alternate_mobile,
+      move_in_date: data.move_in_date,
+      move_out_date: data.move_out_date,
       id: "res-" + Date.now(),
       is_active: true,
       created_at: new Date().toISOString(),
@@ -394,6 +446,13 @@ export const DataStorage = {
     };
     residents.push(newResident);
     setStoredItem("residents", residents);
+
+    // If custom monthly rate provided, set override on flat, else sync with resident type rate
+    if (data.monthly_rate && data.monthly_rate > 0) {
+      this.setFlatMaintenanceRate(data.flat_id, data.monthly_rate);
+    } else {
+      this.syncFlatInvoicesRate(data.flat_id);
+    }
 
     // Set flat to OCCUPIED
     this.updateFlat(data.flat_id, { status: "OCCUPIED" });
@@ -408,6 +467,7 @@ export const DataStorage = {
       mobile: string;
       move_in_date: string;
       notes?: string;
+      monthly_rate?: number;
     }
   ): { current: Resident; archived: FlatResidentHistory } {
     const residents = this.getResidents();
@@ -469,6 +529,12 @@ export const DataStorage = {
     residents.push(newResident);
     setStoredItem("residents", residents);
 
+    if (newResidentData.monthly_rate && newResidentData.monthly_rate > 0) {
+      this.setFlatMaintenanceRate(flatId, newResidentData.monthly_rate);
+    } else {
+      this.syncFlatInvoicesRate(flatId);
+    }
+
     this.updateFlat(flatId, { status: "OCCUPIED" });
     return { current: newResident, archived: archivedRecord };
   },
@@ -508,6 +574,7 @@ export const DataStorage = {
         updated_at: new Date().toISOString(),
       };
       setStoredItem("flats", rawFlats);
+      this.syncFlatInvoicesRate(resident.flat_id);
     }
   },
 
@@ -595,18 +662,18 @@ export const DataStorage = {
     // 2. Ensure each existing flat has exactly 12 months (1 to 12) for the requested year
     let addedMissing = false;
     for (const flat of flats) {
+      const currentRate = this.getFlatMaintenanceRate(flat);
       for (let m = 1; m <= 12; m++) {
         const key = `${flat.id}_${year}_${m}`;
         if (!invoiceMap.has(key)) {
           addedMissing = true;
-          const amt = this.getFlatMaintenanceRate(flat);
           invoiceMap.set(key, {
             id: `inv-${flat.id}-${year}-${m}`,
             flat_id: flat.id,
             resident_id: flat.current_resident?.id || null,
             month: m,
             year,
-            invoice_amount: amt,
+            invoice_amount: currentRate,
             paid_amount: 0,
             due_amount: 0,
             status: "NO_DUES",
@@ -614,6 +681,18 @@ export const DataStorage = {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           });
+        } else {
+          // Keep unbilled or fully unpaid invoices in sync with flat rate (e.g. Tenant vs Owner rate changes)
+          const existingInv = invoiceMap.get(key)!;
+          if (existingInv.status === "NO_DUES" && existingInv.invoice_amount !== currentRate) {
+            existingInv.invoice_amount = currentRate;
+            existingInv.due_amount = 0;
+            addedMissing = true;
+          } else if (existingInv.status === "UNPAID" && Number(existingInv.paid_amount || 0) === 0 && existingInv.invoice_amount !== currentRate) {
+            existingInv.invoice_amount = currentRate;
+            existingInv.due_amount = currentRate;
+            addedMissing = true;
+          }
         }
       }
     }

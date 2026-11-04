@@ -7,6 +7,7 @@ import { DataStorage } from "@/services/dataStorage";
 import { Resident, Flat, FlatResidentHistory } from "@/types/database.types";
 import { formatDate } from "@/utils/dateFormatter";
 import { sanitizeMobileInput, validateMobile, validateEmail } from "@/utils/validation";
+import { AmountInput } from "@/components/common/AmountInput/AmountInput";
 import { PlusCircle, Search, UserCheck, History, Phone, Mail, UserPlus, Trash2, AlertTriangle, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,6 +22,7 @@ export default function ResidentsPage() {
   const [fullName, setFullName] = useState("");
   const [flatId, setFlatId] = useState("");
   const [residentType, setResidentType] = useState<"OWNER" | "TENANT">("OWNER");
+  const [monthlyRate, setMonthlyRate] = useState<number | "">(1100);
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
   const [mobileError, setMobileError] = useState("");
@@ -32,6 +34,7 @@ export default function ResidentsPage() {
   const [currentResident, setCurrentResident] = useState<Resident | null>(null);
   const [newOccupantName, setNewOccupantName] = useState("");
   const [newOccupantType, setNewOccupantType] = useState<"OWNER" | "TENANT">("TENANT");
+  const [newMonthlyRate, setNewMonthlyRate] = useState<number | "">(1500);
   const [newEmail, setNewEmail] = useState("");
   const [newMobile, setNewMobile] = useState("");
   const [newMobileError, setNewMobileError] = useState("");
@@ -61,14 +64,26 @@ export default function ResidentsPage() {
       toast.error("Please add at least one Flat first in Masters > Flats!");
       return;
     }
+    const settings = DataStorage.getSettings();
     setFullName("");
     setFlatId(flats[0].id);
     setResidentType("OWNER");
+    setMonthlyRate(settings.owner_monthly_amount || 1100);
     setEmail("");
     setMobile("");
     setMobileError("");
     setEmailError("");
     setShowAddModal(true);
+  };
+
+  const handleResidentTypeChange = (type: "OWNER" | "TENANT") => {
+    setResidentType(type);
+    const settings = DataStorage.getSettings();
+    setMonthlyRate(
+      type === "TENANT"
+        ? (settings.tenant_monthly_amount || 1500)
+        : (settings.owner_monthly_amount || 1100)
+    );
   };
 
   const handleMobileChange = (val: string) => {
@@ -121,8 +136,11 @@ export default function ResidentsPage() {
         alternate_mobile: null,
         move_in_date: new Date().toISOString().split("T")[0],
         move_out_date: null,
+        monthly_rate: monthlyRate ? Number(monthlyRate) : undefined,
       });
-      toast.success(`Resident ${fullName} registered with payment status NO DUES`);
+      toast.success(
+        `Resident ${fullName} (${residentType}) registered with monthly maintenance ₹${monthlyRate || (residentType === "TENANT" ? 1500 : 1100)}`
+      );
       setShowAddModal(false);
       loadData();
     } catch (err: unknown) {
@@ -132,10 +150,17 @@ export default function ResidentsPage() {
 
   const handleOpenChangeOccupant = (resident: Resident) => {
     const flat = flats.find((f) => f.id === resident.flat_id);
+    const targetType = resident.resident_type === "OWNER" ? "TENANT" : "OWNER";
+    const settings = DataStorage.getSettings();
     setSelectedFlat(flat || null);
     setCurrentResident(resident);
     setNewOccupantName("");
-    setNewOccupantType(resident.resident_type === "OWNER" ? "TENANT" : "OWNER");
+    setNewOccupantType(targetType);
+    setNewMonthlyRate(
+      targetType === "TENANT"
+        ? (settings.tenant_monthly_amount || 1500)
+        : (settings.owner_monthly_amount || 1100)
+    );
     setNewEmail("");
     setNewMobile("");
     setNewMobileError("");
@@ -143,6 +168,16 @@ export default function ResidentsPage() {
     setNewMoveInDate(new Date().toISOString().split("T")[0]);
     setChangeNotes("");
     setShowChangeModal(true);
+  };
+
+  const handleNewOccupantTypeChange = (type: "OWNER" | "TENANT") => {
+    setNewOccupantType(type);
+    const settings = DataStorage.getSettings();
+    setNewMonthlyRate(
+      type === "TENANT"
+        ? (settings.tenant_monthly_amount || 1500)
+        : (settings.owner_monthly_amount || 1100)
+    );
   };
 
   const handleNewMobileChange = (val: string) => {
@@ -193,8 +228,11 @@ export default function ResidentsPage() {
         mobile: newMobile.trim(),
         move_in_date: newMoveInDate,
         notes: changeNotes,
+        monthly_rate: newMonthlyRate ? Number(newMonthlyRate) : undefined,
       });
-      toast.success(`Occupant changed. Prior history preserved in archive.`);
+      toast.success(
+        `Occupant changed to ${newOccupantName} (${newOccupantType}). Monthly maintenance set to ₹${newMonthlyRate}. Prior history preserved in archive.`
+      );
       setShowChangeModal(false);
       loadData();
     } catch (err: unknown) {
@@ -437,11 +475,30 @@ export default function ResidentsPage() {
                       <select
                         className="form-select"
                         value={residentType}
-                        onChange={(e) => setResidentType(e.target.value as "OWNER" | "TENANT")}
+                        onChange={(e) => handleResidentTypeChange(e.target.value as "OWNER" | "TENANT")}
                       >
                         <option value="OWNER">OWNER (Self-Occupied)</option>
                         <option value="TENANT">TENANT (Rented)</option>
                       </select>
+                    </div>
+
+                    <div className="col-12 col-sm-6">
+                      <label className="form-label small fw-bold text-dark">
+                        Monthly Maintenance Rate (₹) <span className="text-danger">*</span>
+                      </label>
+                      <AmountInput
+                        value={monthlyRate}
+                        onChange={(val) => setMonthlyRate(val)}
+                        placeholder="e.g. 1500"
+                        className="form-control"
+                        min={100}
+                        required
+                      />
+                      <small className="text-muted">
+                        {residentType === "TENANT"
+                          ? "Tenant Charge: default ₹1,500/mo"
+                          : "Owner Charge: default ₹1,100/mo"}
+                      </small>
                     </div>
 
                     <div className="col-12">
@@ -583,11 +640,30 @@ export default function ResidentsPage() {
                       <select
                         className="form-select"
                         value={newOccupantType}
-                        onChange={(e) => setNewOccupantType(e.target.value as "OWNER" | "TENANT")}
+                        onChange={(e) => handleNewOccupantTypeChange(e.target.value as "OWNER" | "TENANT")}
                       >
                         <option value="TENANT">TENANT / RENTED</option>
                         <option value="OWNER">NEW OWNER</option>
                       </select>
+                    </div>
+
+                    <div className="col-12 col-sm-6">
+                      <label className="form-label small fw-semibold text-secondary">
+                        Monthly Maintenance Rate (₹) <span className="text-danger">*</span>
+                      </label>
+                      <AmountInput
+                        value={newMonthlyRate}
+                        onChange={(val) => setNewMonthlyRate(val)}
+                        placeholder="e.g. 1500"
+                        className="form-control"
+                        min={100}
+                        required
+                      />
+                      <small className="text-muted">
+                        {newOccupantType === "TENANT"
+                          ? "Tenant Charge: default ₹1,500/mo"
+                          : "Owner Charge: default ₹1,100/mo"}
+                      </small>
                     </div>
 
                     <div className="col-12 col-sm-6">
