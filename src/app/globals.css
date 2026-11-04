@@ -1955,17 +1955,33 @@ body {
   flex-direction: column;
 }
 
+.maintenance-page .maintenance-modal-content form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .maintenance-page .maintenance-modal-content>.modal-header,
-.maintenance-page .maintenance-modal-content>.modal-footer {
+.maintenance-page .maintenance-modal-content form>.modal-header,
+.maintenance-page .maintenance-modal-content>.modal-footer,
+.maintenance-page .maintenance-modal-content form>.modal-footer {
   flex: 0 0 auto;
   gap: 0.75rem;
 }
 
 .maintenance-page .maintenance-modal-content>.modal-body,
 .maintenance-page .maintenance-modal-content form>.modal-body {
+  flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+}
+
+.maintenance-page .maintenance-modal-content form>.modal-footer {
+  margin-top: auto;
 }
 
 .maintenance-page .maintenance-modal-content .modal-title {

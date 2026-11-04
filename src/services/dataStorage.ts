@@ -35,7 +35,23 @@ import {
   initialEmailLogs,
 } from "./mockInitialData";
 
-const STORAGE_KEY_PREFIX = "parijat_erp_v5_";
+const STORAGE_KEY_PREFIX = "parijat_erp_v6_";
+
+// One-time auto-clean of any legacy cache keys to ensure completely fresh truncated live state
+if (typeof window !== "undefined") {
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i);
+      if (k && k.startsWith("parijat_erp_") && !k.startsWith(STORAGE_KEY_PREFIX)) {
+        keysToRemove.push(k);
+      }
+    }
+    keysToRemove.forEach((k) => window.localStorage.removeItem(k));
+  } catch {
+    // Ignore storage errors
+  }
+}
 
 function getStoredItem<T>(key: string, defaultValue: T): T {
   if (typeof window === "undefined") return defaultValue;
@@ -1211,5 +1227,24 @@ export const DataStorage = {
 
     const userRole = roles.find((r) => r.id === user.role_id) || roles.find((r) => r.name === user.role_name);
     return userRole ? userRole.permissions : superAdminRole.permissions;
+  },
+
+  /**
+   * Truncate all live operational data across the system.
+   * Clears: floors, flats, residents, flat histories, rate histories, invoices, expenses, payments, wallet ledger, email logs.
+   * Preserves: society profile, app configuration, roles, and administrative user credentials.
+   */
+  truncateAllOperationalData(): void {
+    if (typeof window === "undefined") return;
+    setStoredItem("floors", []);
+    setStoredItem("flats", []);
+    setStoredItem("residents", []);
+    setStoredItem("flat_history", []);
+    setStoredItem("rate_history", []);
+    setStoredItem("invoices", []);
+    setStoredItem("expenses", []);
+    setStoredItem("payments", []);
+    setStoredItem("wallet_transactions", []);
+    setStoredItem("email_logs", []);
   },
 };

@@ -6,7 +6,7 @@ import { DataStorage } from "@/services/dataStorage";
 import { Society, MaintenanceSettings, MaintenanceRateHistory } from "@/types/database.types";
 import { AmountInput } from "@/components/common/AmountInput/AmountInput";
 import { sanitizeMobileInput, validateMobile, validateEmail } from "@/utils/validation";
-import { Building2, Settings2, History, Save, AlertCircle, TrendingUp, Landmark, QrCode, ShieldCheck, Users2 } from "lucide-react";
+import { Building2, Settings2, History, Save, AlertCircle, TrendingUp, Landmark, QrCode, ShieldCheck, Users2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AppSetupPage() {
@@ -46,6 +46,18 @@ export default function AppSetupPage() {
   const [showRateModal, setShowRateModal] = useState(false);
   const [newRateAmount, setNewRateAmount] = useState<number | "">(1300);
   const [rateReason, setRateReason] = useState("");
+
+  // Truncate Confirmation Modal
+  const [showTruncateConfirm, setShowTruncateConfirm] = useState(false);
+
+  const handleTruncateAllData = () => {
+    DataStorage.truncateAllOperationalData();
+    setShowTruncateConfirm(false);
+    toast.success("All operational data (floors, flats, residents, invoices, expenses, payments) has been truncated successfully!");
+    setTimeout(() => {
+      window.location.reload();
+    }, 800);
+  };
 
   const loadData = () => {
     const s = DataStorage.getSociety();
@@ -591,6 +603,29 @@ export default function AppSetupPage() {
         </div>
       </div>
 
+      {/* Danger Zone: Truncate All Operational Data */}
+      <div className="card-premium border border-danger-subtle mb-4">
+        <div className="p-4 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3">
+          <div>
+            <h6 className="fw-bold text-danger mb-1 d-flex align-items-center gap-2">
+              <Trash2 size={18} />
+              <span>Danger Zone: Truncate All Live Operational Data</span>
+            </h6>
+            <p className="small text-secondary mb-0">
+              Permanently wipes all floors, flats, residents, maintenance records, expenses, and ledger entries. Admin accounts and society setup remain intact.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-outline-danger d-inline-flex align-items-center gap-2 flex-shrink-0"
+            onClick={() => setShowTruncateConfirm(true)}
+          >
+            <Trash2 size={16} />
+            <span>Truncate All Data</span>
+          </button>
+        </div>
+      </div>
+
       {/* Rate Change Modal */}
       {showRateModal && (
         <div
@@ -657,6 +692,51 @@ export default function AppSetupPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Truncate All Data Confirmation Modal */}
+      {showTruncateConfirm && (
+        <div
+          className="modal d-block"
+          tabIndex={-1}
+          style={{ backgroundColor: "rgba(15, 23, 42, 0.6)", zIndex: 1080 }}
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow-lg rounded-4">
+              <div className="modal-header border-bottom px-4 pt-4 pb-3">
+                <h5 className="modal-title fw-bold text-danger d-flex align-items-center gap-2">
+                  <AlertCircle size={20} />
+                  <span>Confirm Truncate All Operational Data</span>
+                </h5>
+                <button type="button" className="btn-close" onClick={() => setShowTruncateConfirm(false)} />
+              </div>
+              <div className="modal-body p-4">
+                <p className="text-secondary mb-3">
+                  Are you absolutely sure you want to <strong>truncate all live data</strong>?
+                </p>
+                <div className="alert alert-danger small mb-0">
+                  <strong>This action cannot be undone:</strong> All floors, flats, residents, maintenance calendar invoices, receipts, and expense records will be deleted immediately. Admin users, roles, and society configuration will be preserved.
+                </div>
+              </div>
+              <div className="modal-footer border-top px-4 py-3 bg-light rounded-bottom-4">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={() => setShowTruncateConfirm(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={handleTruncateAllData}
+                >
+                  Yes, Truncate Everything
+                </button>
+              </div>
             </div>
           </div>
         </div>

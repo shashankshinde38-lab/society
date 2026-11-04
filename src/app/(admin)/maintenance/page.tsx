@@ -844,11 +844,11 @@ export default function MaintenancePage() {
         <div
           className="modal d-block"
           tabIndex={-1}
-          style={{ backgroundColor: "rgba(15, 23, 42, 0.5)", zIndex: 1060 }}
+          style={{ backgroundColor: "rgba(15, 23, 42, 0.5)", zIndex: 1060, overflowY: "auto" }}
         >
           <div className="modal-dialog modal-dialog-centered modal-lg maintenance-modal-dialog">
             <div className="modal-content border-0 shadow-lg rounded-4 maintenance-modal-content">
-              <div className="modal-header border-bottom px-4 pt-4 pb-3">
+              <div className="modal-header border-bottom px-4 pt-4 pb-3 flex-shrink-0">
                 <div>
                   <h5 className="modal-title fw-bold text-dark mb-0">
                     Record Maintenance Payment &mdash; Flat {selectedFlatForPayment.flat_number}
@@ -860,8 +860,8 @@ export default function MaintenancePage() {
                 <button type="button" className="btn-close" onClick={() => setShowPaymentModal(false)} />
               </div>
 
-              <form onSubmit={handleRecordPayment}>
-                <div className="modal-body p-4">
+              <form onSubmit={handleRecordPayment} className="d-flex flex-column flex-grow-1 min-h-0 overflow-hidden">
+                <div className="modal-body p-4 overflow-y-auto" style={{ maxHeight: "calc(100dvh - 210px)" }}>
                   {/* Summary Banner without Outstanding Dues */}
                   <div className="row g-2 p-3 bg-light rounded-3 border mb-3">
                     <div className="col-sm-6">
@@ -1047,7 +1047,7 @@ export default function MaintenancePage() {
                   </div>
                 </div>
 
-                <div className="modal-footer border-top px-4 py-3 bg-light rounded-bottom-4 maintenance-modal-footer">
+                <div className="modal-footer border-top px-4 py-3 bg-light rounded-bottom-4 maintenance-modal-footer flex-shrink-0">
                   <button
                     type="button"
                     className="btn btn-outline-secondary"
@@ -1093,11 +1093,11 @@ export default function MaintenancePage() {
           <div
             className="modal d-block"
             tabIndex={-1}
-            style={{ backgroundColor: "rgba(15, 23, 42, 0.5)", zIndex: 1060 }}
+            style={{ backgroundColor: "rgba(15, 23, 42, 0.5)", zIndex: 1060, overflowY: "auto" }}
           >
             <div className="modal-dialog modal-dialog-centered modal-xl maintenance-modal-dialog maintenance-matrix-dialog">
               <div className="modal-content border-0 shadow-lg rounded-4 maintenance-modal-content">
-                <div className="modal-header border-bottom px-4 pt-4 pb-3">
+                <div className="modal-header border-bottom px-4 pt-4 pb-3 flex-shrink-0">
                   <div>
                     <div className="d-flex align-items-center gap-2 flex-wrap mb-1">
                       <h5 className="modal-title fw-bold text-dark mb-0">
@@ -1138,7 +1138,7 @@ export default function MaintenancePage() {
                   <button type="button" className="btn-close" onClick={() => setShowMatrixModal(false)} />
                 </div>
 
-                <div className="modal-body p-4">
+                <div className="modal-body p-4 overflow-y-auto" style={{ maxHeight: "calc(100dvh - 210px)" }}>
                   {/* Calendar Action & Selection Controls Toolbar */}
                   <div className="p-3 bg-light rounded-3 border mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2 maintenance-matrix-toolbar">
                     <div className="d-flex align-items-center gap-2 flex-wrap">
@@ -1280,7 +1280,7 @@ export default function MaintenancePage() {
                   </div>
                 </div>
 
-                <div className="modal-footer border-top px-4 py-3 bg-light rounded-bottom-4 d-flex flex-wrap justify-content-between align-items-center maintenance-matrix-footer">
+                <div className="modal-footer border-top px-4 py-3 bg-light rounded-bottom-4 d-flex flex-wrap justify-content-between align-items-center maintenance-matrix-footer flex-shrink-0">
                   <div className="d-flex align-items-center gap-2">
                     <span className="small text-secondary">
                       Selected: <strong className="text-dark">{selectedMonthIds.length}</strong> month(s)
@@ -1337,12 +1337,12 @@ export default function MaintenancePage() {
         <div
           className="modal d-block"
           tabIndex={-1}
-          style={{ backgroundColor: "rgba(15, 23, 42, 0.6)", zIndex: 1070 }}
+          style={{ backgroundColor: "rgba(15, 23, 42, 0.6)", zIndex: 1070, overflowY: "auto" }}
         >
           <div className="modal-dialog modal-dialog-centered maintenance-modal-dialog">
             <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden maintenance-modal-content">
               {/* Receipt Header Banner */}
-              <div className="p-4 text-white" style={{ background: "linear-gradient(135deg, #0f172a, #2563eb)" }}>
+              <div className="p-4 text-white flex-shrink-0" style={{ background: "linear-gradient(135deg, #0f172a, #2563eb)" }}>
                 <div className="d-flex align-items-center justify-content-between mb-2">
                   <span className="badge bg-success-subtle text-success border">Payment Confirmed</span>
                   <span className="small text-light opacity-75">{formatDate(activeReceipt.payment_date)}</span>
@@ -1351,7 +1351,7 @@ export default function MaintenancePage() {
                 <div className="small font-monospace opacity-75">{activeReceipt.receipt_number}</div>
               </div>
 
-              <div className="p-4 bg-white">
+              <div className="modal-body p-4 bg-white overflow-y-auto" style={{ maxHeight: "calc(100dvh - 210px)" }}>
                 <div className="d-flex justify-content-between py-2 border-bottom">
                   <span className="text-secondary small">Flat:</span>
                   <span className="fw-bold text-dark">{receiptFlat.flat_number}</span>
@@ -1404,7 +1404,7 @@ export default function MaintenancePage() {
                 )}
               </div>
 
-              <div className="p-3 bg-light border-top d-flex justify-content-between align-items-center flex-wrap gap-2 maintenance-receipt-footer">
+              <div className="p-3 bg-light border-top d-flex justify-content-between align-items-center flex-wrap gap-2 maintenance-receipt-footer flex-shrink-0">
                 <button
                   type="button"
                   className="btn btn-outline-secondary"
@@ -1504,11 +1504,11 @@ export default function MaintenancePage() {
           <div
             className="modal d-block"
             tabIndex={-1}
-            style={{ backgroundColor: "rgba(15, 23, 42, 0.5)", zIndex: 1070 }}
+            style={{ backgroundColor: "rgba(15, 23, 42, 0.5)", zIndex: 1070, overflowY: "auto" }}
           >
             <div className="modal-dialog modal-dialog-centered maintenance-modal-dialog">
               <div className="modal-content border-0 shadow-lg rounded-4 maintenance-modal-content">
-                <div className="modal-header border-bottom px-4 pt-4 pb-3">
+                <div className="modal-header border-bottom px-4 pt-4 pb-3 flex-shrink-0">
                   <div className="d-flex align-items-center gap-2">
                     <div className="p-2 bg-primary-subtle text-primary rounded-circle">
                       <Settings2 size={20} />
@@ -1529,8 +1529,8 @@ export default function MaintenancePage() {
                   />
                 </div>
 
-                <form onSubmit={handleSaveFlatRate}>
-                  <div className="modal-body p-4">
+                <form onSubmit={handleSaveFlatRate} className="d-flex flex-column flex-grow-1 min-h-0 overflow-hidden">
+                  <div className="modal-body p-4 overflow-y-auto" style={{ maxHeight: "calc(100dvh - 210px)" }}>
                     <div className="p-3 bg-light rounded-3 border mb-3">
                       <div className="d-flex align-items-center justify-content-between mb-1">
                         <span className="fw-bold text-dark fs-6">
@@ -1613,7 +1613,7 @@ export default function MaintenancePage() {
                     </div>
                   </div>
 
-                  <div className="modal-footer border-top px-4 py-3 bg-light rounded-bottom-4 maintenance-modal-footer">
+                  <div className="modal-footer border-top px-4 py-3 bg-light rounded-bottom-4 maintenance-modal-footer flex-shrink-0">
                     <button
                       type="button"
                       className="btn btn-outline-secondary"
