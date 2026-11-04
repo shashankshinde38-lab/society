@@ -81,7 +81,9 @@ export async function POST(req: NextRequest) {
 
         // Attach Invoice PDF if provided
         if (item.invoicePdfBase64) {
-          const rawBase64 = item.invoicePdfBase64.replace(/^data:application\/pdf;base64,/, "");
+          const rawBase64 = item.invoicePdfBase64.includes(",")
+            ? item.invoicePdfBase64.split(",")[1]
+            : item.invoicePdfBase64;
           emailAttachments.push({
             filename: `Maintenance_Invoice_${item.receiptNumber || item.flatNumber}.pdf`,
             content: Buffer.from(rawBase64, "base64"),

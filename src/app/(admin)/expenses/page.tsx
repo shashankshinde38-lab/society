@@ -7,21 +7,15 @@ import { SocietyExpense, ExpenseCategory } from "@/types/database.types";
 import { AmountInput } from "@/components/common/AmountInput/AmountInput";
 import { formatDate } from "@/utils/dateFormatter";
 import {
-  Receipt,
   PlusCircle,
   Search,
   Trash2,
-  Calendar,
-  Wallet,
   TrendingDown,
-  Building,
   Tag,
   Paperclip,
   Image as ImageIcon,
   Eye,
   X,
-  Mail,
-  Send,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -37,7 +31,10 @@ export default function ExpensesPage() {
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [amount, setAmount] = useState<number | "">("");
-  const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split("T")[0]);
+  const [expenseDate, setExpenseDate] = useState(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  });
   const [paymentMethod, setPaymentMethod] = useState<"ONLINE" | "CASH" | "CHEQUE">("ONLINE");
   const [vendorName, setVendorName] = useState("");
   const [invoiceBillNo, setInvoiceBillNo] = useState("");
@@ -59,7 +56,8 @@ export default function ExpensesPage() {
     setTitle("");
     setCategoryId(categories.length > 0 ? categories[0].id : "");
     setAmount("");
-    setExpenseDate(new Date().toISOString().split("T")[0]);
+    const today = new Date();
+    setExpenseDate(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`);
     setPaymentMethod("ONLINE");
     setVendorName("");
     setInvoiceBillNo("");
@@ -169,9 +167,9 @@ export default function ExpensesPage() {
 
   const filteredExpenses = expenses.filter((exp) => {
     const matchesSearch =
-      exp.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (exp.vendor_name && exp.vendor_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (exp.invoice_bill_no && exp.invoice_bill_no.toLowerCase().includes(searchTerm.toLowerCase()));
+      (exp.title || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (exp.vendor_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (exp.invoice_bill_no || "").toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesCategory = categoryFilter === "ALL" || exp.category_id === categoryFilter;
     const matchesMethod = methodFilter === "ALL" || exp.payment_method === methodFilter;
@@ -182,7 +180,7 @@ export default function ExpensesPage() {
   const totalExpenseSum = expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
   return (
-    <div>
+    <div className="expenses-page">
       <PageHeader
         title="Society Expense Management"
         subtitle="Record vendor bills, utilities, security salaries, repairs, and maintain automated wallet debits"
@@ -196,7 +194,7 @@ export default function ExpensesPage() {
       />
 
       {/* Top Expense KPI Summary Cards */}
-      <div className="row g-3 mb-4">
+      <div className="row g-3 mb-4 expenses-kpi-grid">
         <div className="col-12 col-sm-6 col-lg-4">
           <div className="stat-card border-start border-4 border-warning">
             <div className="stat-title">Total Expenses Recorded</div>
@@ -228,9 +226,9 @@ export default function ExpensesPage() {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="card-premium mb-4">
-        <div className="p-3 d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
-          <div className="d-flex flex-column flex-sm-row gap-2 flex-grow-1" style={{ maxWidth: "750px" }}>
+      <div className="card-premium mb-4 expenses-filter-card">
+        <div className="p-3 d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 expenses-filter-layout">
+          <div className="d-flex flex-column flex-sm-row gap-2 flex-grow-1 expenses-filter-controls">
             <div className="position-relative flex-grow-1">
               <Search size={16} className="position-absolute text-secondary" style={{ top: "10px", left: "12px" }} />
               <input
@@ -243,8 +241,7 @@ export default function ExpensesPage() {
             </div>
 
             <select
-              className="form-select form-select-sm"
-              style={{ width: "220px" }}
+              className="form-select form-select-sm expenses-category-filter"
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
             >
@@ -257,8 +254,7 @@ export default function ExpensesPage() {
             </select>
 
             <select
-              className="form-select form-select-sm"
-              style={{ width: "160px" }}
+              className="form-select form-select-sm expenses-method-filter"
               value={methodFilter}
               onChange={(e) => setMethodFilter(e.target.value)}
             >
@@ -276,9 +272,9 @@ export default function ExpensesPage() {
       </div>
 
       {/* Expenses Table */}
-      <div className="card-premium">
-        <div className="table-responsive">
-          <table className="table table-premium align-middle mb-0">
+      <div className="card-premium expenses-table-card">
+        <div className="table-responsive expenses-table-scroll">
+          <table className="table table-premium align-middle mb-0 expenses-table">
             <thead>
               <tr>
                 <th>Date</th>
@@ -368,19 +364,22 @@ export default function ExpensesPage() {
       {/* Record Expense Modal */}
       {showAddModal && (
         <div
-          className="modal d-block"
+          className="modal d-block expenses-modal"
           tabIndex={-1}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="expense-modal-title"
           style={{ backgroundColor: "rgba(15, 23, 42, 0.5)", zIndex: 1060 }}
         >
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content border-0 shadow-lg rounded-4">
+          <div className="modal-dialog modal-dialog-centered modal-lg expenses-modal-dialog">
+            <div className="modal-content border-0 shadow-lg rounded-4 expenses-modal-content">
               <div className="modal-header border-bottom px-4 pt-4 pb-3">
-                <h5 className="modal-title fw-bold text-dark">Record Society Expense</h5>
+                <h5 id="expense-modal-title" className="modal-title fw-bold text-dark">Record Society Expense</h5>
                 <button type="button" className="btn-close" onClick={() => setShowAddModal(false)} />
               </div>
 
               <form onSubmit={handleSaveExpense}>
-                <div className="modal-body p-4">
+                <div className="modal-body p-4 expenses-modal-body">
                   <div className="row g-3">
                     <div className="col-12 col-sm-8">
                       <label className="form-label small fw-semibold text-secondary">
@@ -568,7 +567,7 @@ export default function ExpensesPage() {
                   </div>
                 </div>
 
-                <div className="modal-footer border-top px-4 py-3 bg-light rounded-bottom-4">
+                <div className="modal-footer border-top px-4 py-3 bg-light rounded-bottom-4 expenses-modal-footer">
                   <button
                     type="button"
                     className="btn btn-outline-secondary"
@@ -589,11 +588,14 @@ export default function ExpensesPage() {
       {/* Image Preview Modal */}
       {previewImage && (
         <div
-          className="modal d-block"
+          className="modal d-block expenses-preview-modal"
           tabIndex={-1}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Expense attachment preview"
           style={{ backgroundColor: "rgba(15, 23, 42, 0.8)", zIndex: 1090 }}
         >
-          <div className="modal-dialog modal-dialog-centered modal-lg">
+          <div className="modal-dialog modal-dialog-centered modal-lg expenses-preview-dialog">
             <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden bg-dark text-white">
               <div className="modal-header border-bottom border-secondary px-4 py-3 d-flex justify-content-between align-items-center">
                 <h6 className="modal-title fw-bold text-white mb-0 d-flex align-items-center gap-2">

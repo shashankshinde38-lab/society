@@ -373,12 +373,12 @@ export default function MaintenancePage() {
     toast.success("Receipt PDF downloaded / opened successfully!");
   };
 
-  // Directly view PDF in new tab (native viewer on mobile)
+  // Directly view PDF in new tab (or auto-download on mobile for native viewer)
   const handleViewPDFReceipt = () => {
     if (!activeReceipt || !receiptFlat) return;
     const doc = createReceiptPDFDocument(activeReceipt, receiptFlat, receiptAllocatedMonths);
-    viewPDFInNewTab(doc);
-    toast.info("Opening PDF receipt in browser...");
+    viewPDFInNewTab(doc, `${activeReceipt.receipt_number}_${receiptFlat.flat_number}.pdf`);
+    toast.info("Opening PDF receipt...");
   };
 
   // Dispatch Email with attached PDF Invoice Receipt to Resident
@@ -475,7 +475,7 @@ export default function MaintenancePage() {
   const advancePoolSum = flats.reduce((sum, f) => sum + Number(f.advance_balance || 0), 0);
 
   return (
-    <div>
+    <div className="maintenance-page">
       <PageHeader
         title="Maintenance Management & Invoicing"
         subtitle="Manage flat-wise maintenance collections, 12-month calendar tracking, multiple-month payments, and receipts"
@@ -505,7 +505,7 @@ export default function MaintenancePage() {
       />
 
       {/* Top Financial KPI Metric Row */}
-      <div className="row g-3 mb-4">
+      <div className="row g-3 mb-4 maintenance-kpi-grid">
         <div className="col-6 col-lg-3">
           <div className="stat-card border-start border-4 border-success">
             <div className="stat-title">Total Collected</div>
@@ -544,7 +544,7 @@ export default function MaintenancePage() {
       </div>
 
       {/* View Switcher Tabs */}
-      <div className="d-flex align-items-center gap-2 mb-3">
+      <div className="d-flex align-items-center gap-2 mb-3 maintenance-tabs">
         <button
           className={`btn btn-sm btn-tab ${activeTab === "FLATS" ? "active btn-primary-custom" : ""
             } px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5`}
@@ -566,9 +566,9 @@ export default function MaintenancePage() {
       {activeTab === "FLATS" ? (
         <>
           {/* Filter and Search Bar */}
-          <div className="card-premium mb-4">
-            <div className="p-3 d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
-              <div className="d-flex flex-column flex-sm-row gap-2 flex-grow-1" style={{ maxWidth: "750px" }}>
+          <div className="card-premium mb-4 maintenance-filter-card">
+            <div className="p-3 maintenance-filter-layout d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+              <div className="maintenance-filter-controls d-flex flex-column flex-sm-row gap-2 flex-grow-1">
                 <div className="position-relative flex-grow-1">
                   <Search size={16} className="position-absolute text-secondary" style={{ top: "10px", left: "12px" }} />
                   <input
@@ -581,8 +581,7 @@ export default function MaintenancePage() {
                 </div>
 
                 <select
-                  className="form-select form-select-sm"
-                  style={{ width: "160px" }}
+                  className="form-select form-select-sm maintenance-filter-select"
                   value={floorFilter}
                   onChange={(e) => setFloorFilter(e.target.value)}
                 >
@@ -595,8 +594,7 @@ export default function MaintenancePage() {
                 </select>
 
                 <select
-                  className="form-select form-select-sm"
-                  style={{ width: "160px" }}
+                  className="form-select form-select-sm maintenance-filter-select"
                   value={typeFilter}
                   onChange={(e) => setTypeFilter(e.target.value)}
                 >
@@ -606,8 +604,7 @@ export default function MaintenancePage() {
                 </select>
 
                 <select
-                  className="form-select form-select-sm"
-                  style={{ width: "160px" }}
+                  className="form-select form-select-sm maintenance-filter-select"
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                 >
@@ -624,9 +621,9 @@ export default function MaintenancePage() {
           </div>
 
           {/* Flat-wise Maintenance Master Table */}
-          <div className="card-premium">
-            <div className="table-responsive">
-              <table className="table table-premium align-middle mb-0">
+          <div className="card-premium maintenance-table-card">
+            <div className="table-responsive maintenance-table-scroll">
+              <table className="table table-premium align-middle mb-0 maintenance-data-table">
                 <thead>
                   <tr>
                     <th>Flat #</th>
@@ -741,9 +738,9 @@ export default function MaintenancePage() {
         </>
       ) : (
         /* Payment Records Tab */
-        <div className="card-premium">
-          <div className="table-responsive">
-            <table className="table table-premium align-middle mb-0">
+        <div className="card-premium maintenance-table-card">
+          <div className="table-responsive maintenance-table-scroll">
+            <table className="table table-premium align-middle mb-0 maintenance-data-table">
               <thead>
                 <tr>
                   <th>Receipt #</th>
@@ -849,8 +846,8 @@ export default function MaintenancePage() {
           tabIndex={-1}
           style={{ backgroundColor: "rgba(15, 23, 42, 0.5)", zIndex: 1060 }}
         >
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content border-0 shadow-lg rounded-4">
+          <div className="modal-dialog modal-dialog-centered modal-lg maintenance-modal-dialog">
+            <div className="modal-content border-0 shadow-lg rounded-4 maintenance-modal-content">
               <div className="modal-header border-bottom px-4 pt-4 pb-3">
                 <div>
                   <h5 className="modal-title fw-bold text-dark mb-0">
@@ -1050,7 +1047,7 @@ export default function MaintenancePage() {
                   </div>
                 </div>
 
-                <div className="modal-footer border-top px-4 py-3 bg-light rounded-bottom-4">
+                <div className="modal-footer border-top px-4 py-3 bg-light rounded-bottom-4 maintenance-modal-footer">
                   <button
                     type="button"
                     className="btn btn-outline-secondary"
@@ -1098,8 +1095,8 @@ export default function MaintenancePage() {
             tabIndex={-1}
             style={{ backgroundColor: "rgba(15, 23, 42, 0.5)", zIndex: 1060 }}
           >
-            <div className="modal-dialog modal-dialog-centered modal-xl">
-              <div className="modal-content border-0 shadow-lg rounded-4">
+            <div className="modal-dialog modal-dialog-centered modal-xl maintenance-modal-dialog maintenance-matrix-dialog">
+              <div className="modal-content border-0 shadow-lg rounded-4 maintenance-modal-content">
                 <div className="modal-header border-bottom px-4 pt-4 pb-3">
                   <div>
                     <div className="d-flex align-items-center gap-2 flex-wrap mb-1">
@@ -1143,7 +1140,7 @@ export default function MaintenancePage() {
 
                 <div className="modal-body p-4">
                   {/* Calendar Action & Selection Controls Toolbar */}
-                  <div className="p-3 bg-light rounded-3 border mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                  <div className="p-3 bg-light rounded-3 border mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2 maintenance-matrix-toolbar">
                     <div className="d-flex align-items-center gap-2 flex-wrap">
                       <button
                         type="button"
@@ -1185,8 +1182,8 @@ export default function MaintenancePage() {
                   </div>
 
                   {/* 12-Month Calendar Table */}
-                  <div className="table-responsive">
-                    <table className="table table-bordered table-premium align-middle mb-0">
+                  <div className="table-responsive maintenance-matrix-table-scroll">
+                    <table className="table table-bordered table-premium align-middle mb-0 maintenance-matrix-table">
                       <thead>
                         <tr>
                           <th className="text-center" style={{ width: "90px" }}>
@@ -1283,7 +1280,7 @@ export default function MaintenancePage() {
                   </div>
                 </div>
 
-                <div className="modal-footer border-top px-4 py-3 bg-light rounded-bottom-4 d-flex flex-wrap justify-content-between align-items-center">
+                <div className="modal-footer border-top px-4 py-3 bg-light rounded-bottom-4 d-flex flex-wrap justify-content-between align-items-center maintenance-matrix-footer">
                   <div className="d-flex align-items-center gap-2">
                     <span className="small text-secondary">
                       Selected: <strong className="text-dark">{selectedMonthIds.length}</strong> month(s)
@@ -1295,7 +1292,7 @@ export default function MaintenancePage() {
                     )}
                   </div>
 
-                  <div className="d-flex align-items-center gap-2">
+                  <div className="d-flex align-items-center gap-2 maintenance-matrix-footer-actions">
                     <button
                       type="button"
                       className="btn btn-outline-secondary btn-tab"
@@ -1342,8 +1339,8 @@ export default function MaintenancePage() {
           tabIndex={-1}
           style={{ backgroundColor: "rgba(15, 23, 42, 0.6)", zIndex: 1070 }}
         >
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+          <div className="modal-dialog modal-dialog-centered maintenance-modal-dialog">
+            <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden maintenance-modal-content">
               {/* Receipt Header Banner */}
               <div className="p-4 text-white" style={{ background: "linear-gradient(135deg, #0f172a, #2563eb)" }}>
                 <div className="d-flex align-items-center justify-content-between mb-2">
@@ -1407,7 +1404,7 @@ export default function MaintenancePage() {
                 )}
               </div>
 
-              <div className="p-3 bg-light border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <div className="p-3 bg-light border-top d-flex justify-content-between align-items-center flex-wrap gap-2 maintenance-receipt-footer">
                 <button
                   type="button"
                   className="btn btn-outline-secondary"
@@ -1415,7 +1412,7 @@ export default function MaintenancePage() {
                 >
                   Close
                 </button>
-                <div className="action-buttons">
+                <div className="action-buttons maintenance-receipt-actions">
                   {receiptFlat.current_resident?.email && (
                     <button
                       type="button"
@@ -1467,7 +1464,7 @@ export default function MaintenancePage() {
           tabIndex={-1}
           style={{ backgroundColor: "rgba(15, 23, 42, 0.8)", zIndex: 1090 }}
         >
-          <div className="modal-dialog modal-dialog-centered modal-lg">
+          <div className="modal-dialog modal-dialog-centered modal-lg maintenance-modal-dialog">
             <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden bg-dark text-white">
               <div className="modal-header border-bottom border-secondary px-4 py-3 d-flex justify-content-between align-items-center">
                 <h6 className="modal-title fw-bold text-white mb-0 d-flex align-items-center gap-2">
@@ -1509,8 +1506,8 @@ export default function MaintenancePage() {
             tabIndex={-1}
             style={{ backgroundColor: "rgba(15, 23, 42, 0.5)", zIndex: 1070 }}
           >
-            <div className="modal-dialog modal-dialog-centered">
-              <div className="modal-content border-0 shadow-lg rounded-4">
+            <div className="modal-dialog modal-dialog-centered maintenance-modal-dialog">
+              <div className="modal-content border-0 shadow-lg rounded-4 maintenance-modal-content">
                 <div className="modal-header border-bottom px-4 pt-4 pb-3">
                   <div className="d-flex align-items-center gap-2">
                     <div className="p-2 bg-primary-subtle text-primary rounded-circle">
@@ -1541,11 +1538,10 @@ export default function MaintenancePage() {
                         </span>
                         {resident ? (
                           <span
-                            className={`badge ${
-                              isTenant
-                                ? "bg-warning text-dark border"
-                                : "bg-primary text-white"
-                            }`}
+                            className={`badge ${isTenant
+                              ? "bg-warning text-dark border"
+                              : "bg-primary text-white"
+                              }`}
                           >
                             {resident.resident_type}
                           </span>
@@ -1569,22 +1565,20 @@ export default function MaintenancePage() {
                       <div className="d-flex gap-2 flex-wrap">
                         <button
                           type="button"
-                          className={`btn btn-sm ${
-                            Number(rateInputValue) === tenantRate
-                              ? "btn-warning text-dark fw-bold"
-                              : "btn-outline-secondary"
-                          }`}
+                          className={`btn btn-sm ${Number(rateInputValue) === tenantRate
+                            ? "btn-warning text-dark fw-bold"
+                            : "btn-outline-secondary"
+                            }`}
                           onClick={() => setRateInputValue(tenantRate)}
                         >
                           Tenant Rate (₹{tenantRate.toLocaleString()})
                         </button>
                         <button
                           type="button"
-                          className={`btn btn-sm ${
-                            Number(rateInputValue) === ownerRate
-                              ? "btn-primary fw-bold"
-                              : "btn-outline-secondary"
-                          }`}
+                          className={`btn btn-sm ${Number(rateInputValue) === ownerRate
+                            ? "btn-primary fw-bold"
+                            : "btn-outline-secondary"
+                            }`}
                           onClick={() => setRateInputValue(ownerRate)}
                         >
                           Owner Rate (₹{ownerRate.toLocaleString()})
@@ -1619,7 +1613,7 @@ export default function MaintenancePage() {
                     </div>
                   </div>
 
-                  <div className="modal-footer border-top px-4 py-3 bg-light rounded-bottom-4">
+                  <div className="modal-footer border-top px-4 py-3 bg-light rounded-bottom-4 maintenance-modal-footer">
                     <button
                       type="button"
                       className="btn btn-outline-secondary"

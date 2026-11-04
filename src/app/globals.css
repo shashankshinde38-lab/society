@@ -1459,3 +1459,735 @@ body {
     transform: none !important;
   }
 }
+
+/* ==========================================================
+   Expense + Maintenance Pages — Shared Responsive Refinements
+   Additive overrides only. Keeps existing components, state,
+   DataStorage, wallet, PDF and mailer integrations unchanged.
+   ========================================================== */
+
+/* Prevent flex/grid children from forcing page overflow. */
+.admin-content,
+.admin-content>div,
+.admin-content .row,
+.admin-content [class*="col-"],
+.card-premium,
+.stat-card,
+.modal-content,
+.modal-header,
+.modal-body,
+.modal-footer {
+  min-width: 0;
+}
+
+/* KPI cards used by both Expense and Maintenance screens. */
+.stat-card {
+  height: 100%;
+  overflow-wrap: anywhere;
+}
+
+.stat-card .stat-title {
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.stat-card .stat-value {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Filters: inputs and selects must shrink instead of pushing the page. */
+.card-premium>.p-3>.d-flex.flex-column.flex-lg-row,
+.card-premium .d-flex.flex-column.flex-sm-row {
+  min-width: 0;
+  width: 100%;
+}
+
+.card-premium .d-flex.flex-column.flex-sm-row>.position-relative {
+  min-width: 180px;
+}
+
+.card-premium .d-flex.flex-column.flex-sm-row>.form-select {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Keep long financial tables readable; scroll inside the table wrapper. */
+.card-premium .table-responsive {
+  overscroll-behavior-x: contain;
+}
+
+.card-premium .table-premium {
+  width: 100%;
+  min-width: 760px;
+}
+
+.card-premium .table-premium th,
+.card-premium .table-premium td {
+  vertical-align: middle;
+}
+
+.card-premium .table-premium td {
+  overflow-wrap: break-word;
+}
+
+/* Annual 12-month matrix needs its own horizontal scroll area on phones. */
+.modal-xl .table-responsive .table-premium {
+  min-width: 850px;
+}
+
+/* Tabs and action toolbars wrap with consistent gaps. */
+.admin-content .d-flex.align-items-center.gap-2.mb-3,
+.modal-body .d-flex.flex-wrap,
+.modal-body .d-flex.align-items-center.gap-2.flex-wrap,
+.modal-footer .d-flex.align-items-center.gap-2 {
+  min-width: 0;
+}
+
+.admin-content .btn-tab,
+.modal-body .btn-tab {
+  min-height: 34px;
+}
+
+/* Modal headers: prevent title, close control and badges colliding. */
+.modal-header {
+  gap: 0.85rem;
+}
+
+.modal-header>div,
+.modal-header .modal-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.modal-header .btn-close {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.modal-body img {
+  max-width: 100%;
+}
+
+.modal-body .form-control,
+.modal-body .form-select,
+.modal-body textarea {
+  width: 100%;
+  min-width: 0;
+}
+
+.modal-body .row>[class*="col-"] {
+  min-width: 0;
+}
+
+/* Attachment preview rows should wrap instead of overflowing. */
+.modal-body .bg-light.border.rounded-3.d-flex,
+.modal-body .bg-light.border.rounded-3 {
+  min-width: 0;
+}
+
+.modal-body .flex-grow-1 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Receipt dialog content remains readable on narrow screens. */
+.modal-dialog:not(.modal-lg):not(.modal-xl) {
+  width: min(94vw, 560px);
+}
+
+/* Medium screens and tablets. */
+@media (max-width: 991.98px) {
+  .admin-content .card-premium>.p-3 {
+    align-items: stretch !important;
+  }
+
+  .card-premium .d-flex.flex-column.flex-sm-row {
+    max-width: 100% !important;
+  }
+
+  .card-premium .d-flex.flex-column.flex-sm-row>.position-relative,
+  .card-premium .d-flex.flex-column.flex-sm-row>.form-select {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 1 100%;
+  }
+
+  .admin-content .d-flex.align-items-center.gap-2.mb-3 {
+    flex-wrap: wrap;
+  }
+
+  .modal-dialog.modal-xl,
+  .modal-dialog.modal-lg {
+    max-width: calc(100vw - 2rem);
+  }
+}
+
+/* Phones. */
+@media (max-width: 575.98px) {
+  .admin-content {
+    padding: 0.75rem 0.65rem;
+  }
+
+  .stat-card {
+    padding: 0.9rem;
+    border-radius: 11px;
+  }
+
+  .stat-card .stat-title {
+    font-size: 0.68rem;
+    letter-spacing: 0.025em;
+  }
+
+  .stat-card .stat-value {
+    font-size: clamp(1.05rem, 5vw, 1.35rem) !important;
+    line-height: 1.25;
+  }
+
+  /* The maintenance page has four half-width KPI cards. */
+  .admin-content>div>.row.g-3.mb-4>[class*="col-6"] {
+    min-width: 0;
+  }
+
+  .admin-content .card-premium>.p-3 {
+    padding: 0.85rem !important;
+  }
+
+  .card-premium .d-flex.flex-column.flex-sm-row {
+    gap: 0.6rem !important;
+  }
+
+  .admin-content .d-flex.align-items-center.gap-2.mb-3 {
+    display: flex;
+    align-items: stretch !important;
+    gap: 0.55rem !important;
+  }
+
+  .admin-content .d-flex.align-items-center.gap-2.mb-3 .btn-tab {
+    flex: 1 1 100%;
+    justify-content: center;
+    white-space: normal;
+    min-width: 0;
+    padding: 0.55rem 0.65rem !important;
+  }
+
+  .modal-dialog,
+  .modal-dialog.modal-lg,
+  .modal-dialog.modal-xl {
+    width: calc(100vw - 0.75rem);
+    max-width: calc(100vw - 0.75rem) !important;
+    margin: 0.375rem auto;
+  }
+
+  .modal-content {
+    max-height: calc(100dvh - 0.75rem);
+    border-radius: 12px !important;
+  }
+
+  .modal-header {
+    align-items: flex-start;
+    padding: 0.9rem 1rem !important;
+  }
+
+  .modal-header .modal-title {
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+
+  .modal-body {
+    padding: 1rem !important;
+  }
+
+  .modal-footer {
+    padding: 0.85rem 1rem !important;
+    gap: 0.55rem !important;
+  }
+
+  .modal-footer>.btn,
+  .modal-footer .d-flex>.btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .modal-footer .badge {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  /* Matrix footer has summary and action groups; stack them neatly. */
+  .modal-xl .modal-footer {
+    align-items: stretch !important;
+    flex-direction: column;
+  }
+
+  .modal-xl .modal-footer>div {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .modal-xl .modal-footer>div:last-child {
+    display: grid !important;
+    grid-template-columns: 1fr;
+    gap: 0.55rem !important;
+  }
+
+  .modal-xl .modal-footer>div:last-child .btn {
+    width: 100%;
+    margin: 0 !important;
+  }
+
+  /* Keep long modal descriptions and labels from stretching the viewport. */
+  .modal-body .small,
+  .modal-body label,
+  .modal-body strong {
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 390px) {
+  .admin-content {
+    padding-inline: 0.55rem;
+  }
+
+  .stat-card {
+    padding: 0.75rem;
+  }
+
+  .stat-card .stat-title {
+    font-size: 0.63rem;
+  }
+
+  .stat-card .stat-value {
+    font-size: 1.05rem !important;
+  }
+
+  .modal-body {
+    padding: 0.85rem !important;
+  }
+
+  .modal-footer .btn {
+    font-size: 0.78rem;
+  }
+}
+
+/* Touch devices: avoid hover movement and keep tap targets usable. */
+@media (hover: none) and (pointer: coarse) {
+  .stat-card:hover {
+    transform: none;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .btn,
+  .form-check-input {
+    touch-action: manipulation;
+  }
+}
+
+
+/* =========================================================
+   MAINTENANCE PAGE — RESPONSIVE ALIGNMENT LAYER
+   Additive and scoped: does not change application logic.
+   ========================================================= */
+.maintenance-page {
+  width: 100%;
+  min-width: 0;
+  display: block;
+}
+
+.maintenance-page *,
+.maintenance-page *::before,
+.maintenance-page *::after {
+  box-sizing: border-box;
+}
+
+.maintenance-page>* {
+  min-width: 0;
+}
+
+.maintenance-page .maintenance-kpi-grid {
+  align-items: stretch;
+}
+
+.maintenance-page .maintenance-kpi-grid>[class*="col-"] {
+  display: flex;
+  min-width: 0;
+}
+
+.maintenance-page .maintenance-kpi-grid .stat-card {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  overflow-wrap: anywhere;
+}
+
+.maintenance-page .stat-value {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.maintenance-page .maintenance-tabs {
+  flex-wrap: wrap;
+}
+
+.maintenance-page .maintenance-tabs .btn {
+  min-height: 38px;
+  white-space: normal;
+  justify-content: center;
+}
+
+.maintenance-page .maintenance-filter-card,
+.maintenance-page .maintenance-table-card {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.maintenance-page .maintenance-filter-layout {
+  min-width: 0;
+}
+
+.maintenance-page .maintenance-filter-controls {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  align-items: stretch;
+}
+
+.maintenance-page .maintenance-filter-controls>* {
+  min-width: 0;
+}
+
+.maintenance-page .maintenance-filter-controls .position-relative {
+  flex: 1 1 240px;
+}
+
+.maintenance-page .maintenance-filter-controls .form-control,
+.maintenance-page .maintenance-filter-controls .form-select,
+.maintenance-page .maintenance-filter-select {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+}
+
+.maintenance-page .maintenance-filter-layout>.small {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.maintenance-page .maintenance-table-scroll,
+.maintenance-page .maintenance-matrix-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.maintenance-page .maintenance-data-table {
+  width: 100%;
+  min-width: 980px;
+  margin-bottom: 0;
+  vertical-align: middle;
+}
+
+.maintenance-page .maintenance-data-table th,
+.maintenance-page .maintenance-data-table td {
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.maintenance-page .maintenance-data-table td:nth-child(3) {
+  min-width: 170px;
+  white-space: normal;
+}
+
+.maintenance-page .maintenance-data-table .btn {
+  max-width: 100%;
+  white-space: normal;
+}
+
+.maintenance-page .maintenance-matrix-table {
+  min-width: 900px;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.maintenance-page .maintenance-matrix-table th,
+.maintenance-page .maintenance-matrix-table td {
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.maintenance-page .maintenance-matrix-toolbar {
+  min-width: 0;
+}
+
+.maintenance-page .maintenance-matrix-toolbar>div {
+  min-width: 0;
+}
+
+.maintenance-page .maintenance-matrix-toolbar .btn {
+  min-height: 34px;
+  white-space: normal;
+}
+
+.maintenance-page .maintenance-modal-dialog {
+  width: calc(100% - 2rem);
+  max-width: var(--bs-modal-width, 500px);
+  margin: 1rem auto;
+}
+
+.maintenance-page .maintenance-matrix-dialog {
+  max-width: min(1200px, calc(100vw - 2rem));
+}
+
+.maintenance-page .maintenance-modal-content {
+  width: 100%;
+  min-width: 0;
+  max-height: calc(100dvh - 2rem);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.maintenance-page .maintenance-modal-content>.modal-header,
+.maintenance-page .maintenance-modal-content>.modal-footer {
+  flex: 0 0 auto;
+  gap: 0.75rem;
+}
+
+.maintenance-page .maintenance-modal-content>.modal-body,
+.maintenance-page .maintenance-modal-content form>.modal-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.maintenance-page .maintenance-modal-content .modal-title {
+  overflow-wrap: anywhere;
+}
+
+.maintenance-page .maintenance-modal-content .modal-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.625rem;
+}
+
+.maintenance-page .maintenance-modal-content .modal-footer .btn {
+  min-height: 38px;
+}
+
+.maintenance-page .maintenance-matrix-footer {
+  gap: 1rem;
+}
+
+.maintenance-page .maintenance-matrix-footer>div {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.maintenance-page .maintenance-matrix-footer-actions {
+  justify-content: flex-end;
+}
+
+.maintenance-page .maintenance-receipt-footer {
+  align-items: stretch;
+}
+
+.maintenance-page .maintenance-receipt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.625rem;
+  min-width: 0;
+}
+
+.maintenance-page .maintenance-receipt-actions .btn {
+  min-height: 38px;
+  white-space: normal;
+}
+
+.maintenance-page .form-control,
+.maintenance-page .form-select {
+  max-width: 100%;
+}
+
+.maintenance-page img {
+  max-width: 100%;
+}
+
+@media (max-width: 991.98px) {
+  .maintenance-page .maintenance-filter-controls {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .maintenance-page .maintenance-filter-controls .position-relative {
+    grid-column: 1 / -1;
+  }
+
+  .maintenance-page .maintenance-filter-layout>.small {
+    align-self: flex-start;
+  }
+
+  .maintenance-page .maintenance-matrix-dialog {
+    max-width: calc(100vw - 1.5rem);
+  }
+
+  .maintenance-page .maintenance-modal-content {
+    max-height: calc(100dvh - 1.5rem);
+  }
+}
+
+@media (max-width: 575.98px) {
+  .maintenance-page .maintenance-kpi-grid {
+    --bs-gutter-x: 0.75rem;
+    --bs-gutter-y: 0.75rem;
+  }
+
+  .maintenance-page .maintenance-kpi-grid>[class*="col-"] {
+    min-width: 0;
+  }
+
+  .maintenance-page .stat-card {
+    padding: 0.875rem !important;
+  }
+
+  .maintenance-page .stat-title {
+    font-size: 0.75rem;
+    line-height: 1.35;
+  }
+
+  .maintenance-page .stat-value {
+    font-size: clamp(1.05rem, 4.8vw, 1.4rem);
+    line-height: 1.25;
+  }
+
+  .maintenance-page .maintenance-tabs {
+    display: grid !important;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .maintenance-page .maintenance-tabs .btn {
+    width: 100%;
+  }
+
+  .maintenance-page .maintenance-filter-layout {
+    padding: 0.875rem !important;
+  }
+
+  .maintenance-page .maintenance-filter-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .maintenance-page .maintenance-filter-controls .position-relative {
+    grid-column: auto;
+  }
+
+  .maintenance-page .maintenance-filter-layout>.small {
+    white-space: normal;
+  }
+
+  .maintenance-page .maintenance-modal-dialog,
+  .maintenance-page .maintenance-matrix-dialog {
+    width: calc(100% - 1rem);
+    max-width: none;
+    margin: 0.5rem auto;
+    min-height: calc(100% - 1rem);
+    align-items: center;
+  }
+
+  .maintenance-page .maintenance-modal-content {
+    max-height: calc(100dvh - 1rem);
+    border-radius: 0.875rem !important;
+  }
+
+  .maintenance-page .maintenance-modal-content .modal-header,
+  .maintenance-page .maintenance-modal-content .modal-body {
+    padding: 1rem !important;
+  }
+
+  .maintenance-page .maintenance-modal-content .modal-footer {
+    padding: 0.875rem 1rem !important;
+  }
+
+  .maintenance-page .maintenance-modal-content .modal-footer .btn {
+    flex: 1 1 130px;
+  }
+
+  .maintenance-page .maintenance-matrix-toolbar {
+    align-items: stretch !important;
+  }
+
+  .maintenance-page .maintenance-matrix-toolbar>div {
+    width: 100%;
+  }
+
+  .maintenance-page .maintenance-matrix-footer {
+    align-items: stretch !important;
+  }
+
+  .maintenance-page .maintenance-matrix-footer>div {
+    width: 100%;
+  }
+
+  .maintenance-page .maintenance-matrix-footer-actions {
+    display: grid !important;
+    grid-template-columns: 1fr;
+  }
+
+  .maintenance-page .maintenance-matrix-footer-actions .btn {
+    width: 100%;
+  }
+
+  .maintenance-page .maintenance-receipt-footer {
+    flex-direction: column;
+  }
+
+  .maintenance-page .maintenance-receipt-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .maintenance-page .maintenance-receipt-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .maintenance-page .maintenance-modal-content .d-flex.justify-content-between {
+    gap: 0.5rem;
+  }
+
+  .maintenance-page .maintenance-modal-content .d-flex.justify-content-between> :last-child {
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 380px) {
+  .maintenance-page .maintenance-kpi-grid>[class*="col-"] {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+
+  .maintenance-page .maintenance-modal-content .modal-title {
+    font-size: 1rem;
+  }
+
+  .maintenance-page .maintenance-matrix-toolbar .btn {
+    width: 100%;
+  }
+}
