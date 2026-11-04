@@ -1,41 +1,39 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  Building2,
-  Users,
-  CreditCard,
-  Wallet,
+  AlertCircle,
   ArrowUpRight,
-  ArrowDownRight,
-  Receipt,
+  Building2,
+  Calendar,
+  CreditCard,
+  FileSpreadsheet,
   Layers,
   PlusCircle,
-  FileSpreadsheet,
-  Calendar,
-  AlertCircle,
-  PieChart as PieIcon,
-  BarChart3,
+  Receipt,
+  Users,
+  Wallet,
 } from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+
 import { PageHeader } from "@/components/common/PageHeader/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge/StatusBadge";
 import { DataStorage } from "@/services/dataStorage";
 import { DashboardMetrics, MaintenancePayment } from "@/types/database.types";
 import { formatDate } from "@/utils/dateFormatter";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
 
 interface MonthlyTrendPoint {
   month: string;
@@ -43,14 +41,26 @@ interface MonthlyTrendPoint {
   expenses: number;
 }
 
+const formatCurrency = (value: number | string | null | undefined) =>
+  `₹${Number(value ?? 0).toLocaleString("en-IN")}`;
+
+const getFinancialYearLabel = (date: Date) => {
+  // Indian financial year runs from April through March.
+  const startYear = date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1;
+  const endYear = String(startYear + 1).slice(-2);
+  return `FY ${startYear}–${endYear}`;
+};
+
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [recentPayments, setRecentPayments] = useState<MaintenancePayment[]>([]);
   const [monthlyTrends, setMonthlyTrends] = useState<MonthlyTrendPoint[]>([]);
   const [currentMonthFull, setCurrentMonthFull] = useState<string>("");
   const [currentMonthShort, setCurrentMonthShort] = useState<string>("");
+  const [financialYear, setFinancialYear] = useState<string>("");
 
   useEffect(() => {
+    // Keep the existing DataStorage integration and data sources unchanged.
     const loadedMetrics = DataStorage.getDashboardMetrics();
     const payments = DataStorage.getPayments();
     const expenses = DataStorage.getExpenses();
@@ -59,320 +69,370 @@ export default function DashboardPage() {
     setRecentPayments(payments.slice(0, 5));
 
     const now = new Date();
-    const shortLabel = now.toLocaleString("en-US", { month: "short", year: "numeric" });
-    const fullLabel = now.toLocaleString("en-US", { month: "long", year: "numeric" });
+    const shortLabel = now.toLocaleString("en-US", {
+      month: "short",
+      year: "numeric",
+    });
+    const fullLabel = now.toLocaleString("en-US", {
+      month: "long",
+      year: "numeric",
+    });
+
     setCurrentMonthShort(shortLabel);
     setCurrentMonthFull(fullLabel);
+    setFinancialYear(getFinancialYearLabel(now));
 
-    // Dynamic aggregation starting from this month
+    // Aggregate the existing payment and expense records by calendar month.
     const trendMap = new Map<string, MonthlyTrendPoint>();
 
-    // Always seed this month at 0 so it starts from this month
     trendMap.set(shortLabel, {
       month: shortLabel,
       collected: 0,
       expenses: 0,
     });
 
-    // Populate actual payment collections
-    payments.forEach((p) => {
-      const d = new Date(p.payment_date);
-      const mLabel = !isNaN(d.getTime())
-        ? d.toLocaleString("en-US", { month: "short", year: "numeric" })
+    payments.forEach((payment) => {
+      const paymentDate = new Date(payment.payment_date);
+      const monthLabel = !Number.isNaN(paymentDate.getTime())
+        ? paymentDate.toLocaleString("en-US", { month: "short", year: "numeric" })
         : shortLabel;
-      if (!trendMap.has(mLabel)) {
-        trendMap.set(mLabel, { month: mLabel, collected: 0, expenses: 0 });
+
+      if (!trendMap.has(monthLabel)) {
+        trendMap.set(monthLabel, {
+          month: monthLabel,
+          collected: 0,
+          expenses: 0,
+        });
       }
-      trendMap.get(mLabel)!.collected += Number(p.total_amount_received || 0);
+
+      trendMap.get(monthLabel)!.collected += Number(payment.total_amount_received || 0);
     });
 
-    // Populate actual expenses
-    expenses.forEach((e) => {
-      const d = new Date(e.expense_date);
-      const mLabel = !isNaN(d.getTime())
-        ? d.toLocaleString("en-US", { month: "short", year: "numeric" })
+    expenses.forEach((expense) => {
+      const expenseDate = new Date(expense.expense_date);
+      const monthLabel = !Number.isNaN(expenseDate.getTime())
+        ? expenseDate.toLocaleString("en-US", { month: "short", year: "numeric" })
         : shortLabel;
-      if (!trendMap.has(mLabel)) {
-        trendMap.set(mLabel, { month: mLabel, collected: 0, expenses: 0 });
+
+      if (!trendMap.has(monthLabel)) {
+        trendMap.set(monthLabel, {
+          month: monthLabel,
+          collected: 0,
+          expenses: 0,
+        });
       }
-      trendMap.get(mLabel)!.expenses += Number(e.amount || 0);
+
+      trendMap.get(monthLabel)!.expenses += Number(expense.amount || 0);
     });
 
-    setMonthlyTrends(Array.from(trendMap.values()));
+    // Keep the chart in chronological order, including the current month when it is empty.
+    const sortedTrends = Array.from(trendMap.values()).sort((first, second) => {
+      return new Date(`${first.month} 1`).getTime() - new Date(`${second.month} 1`).getTime();
+    });
+
+    setMonthlyTrends(sortedTrends);
   }, []);
 
   if (!metrics) {
-    return <div className="p-5 text-center text-secondary">Loading dashboard analytics...</div>;
+    return (
+      <div className="dashboard-loading" role="status" aria-live="polite">
+        <span className="spinner-border spinner-border-sm text-primary" aria-hidden="true" />
+        <span>Loading dashboard analytics...</span>
+      </div>
+    );
   }
 
   const occupancyPieData =
     metrics.totalFlats > 0 && (metrics.ownerOccupied > 0 || metrics.rentedFlats > 0)
       ? [
-          { name: "Owner Occupied", value: metrics.ownerOccupied, color: "#2563eb" },
-          { name: "Tenant / Rented", value: metrics.rentedFlats, color: "#f59e0b" },
-        ]
+        { name: "Owner Occupied", value: metrics.ownerOccupied, color: "#2563eb" },
+        { name: "Tenant / Rented", value: metrics.rentedFlats, color: "#f59e0b" },
+      ]
       : [{ name: "No Flats Added", value: 1, color: "#e2e8f0" }];
 
   return (
-    <div>
-      {/* Header */}
+    <main className="dashboard-page">
       <PageHeader
         title="Society Overview & Financial Dashboard"
         subtitle="Real-time financial status, wallet liquidity, occupancy distribution, and billing analytics"
         breadcrumbs={[{ label: "Dashboard" }]}
         actions={
-          <div className="d-flex align-items-center gap-2 flex-wrap w-100 w-sm-auto">
-            <div className="d-flex align-items-center gap-1.5 bg-white px-2.5 py-1.5 border rounded-3 shadow-sm flex-grow-1 flex-sm-grow-0">
-              <Calendar size={15} className="text-primary flex-shrink-0" />
-              <span className="small fw-semibold text-dark text-nowrap">
-                FY 2026–27 ({currentMonthShort})
+          <div className="dashboard-header-actions">
+            <div className="dashboard-period">
+              <Calendar size={16} className="text-primary flex-shrink-0" aria-hidden="true" />
+              <span>
+                {financialYear} <span className="dashboard-period-separator">·</span> {currentMonthShort}
               </span>
             </div>
-            <Link
-              href="/maintenance"
-              className="btn btn-primary-custom flex-grow-1 flex-sm-grow-0 justify-content-center"
-            >
-              <PlusCircle size={16} />
+            <Link href="/maintenance" className="btn btn-primary-custom dashboard-collect-button">
+              <PlusCircle size={16} aria-hidden="true" />
               <span>Collect Payment</span>
             </Link>
           </div>
         }
       />
 
-      {/* Row 1: Primary Financial KPIs */}
-      <div className="row g-3 mb-4">
-        {/* Available Wallet Balance */}
+      {/* Primary financial KPIs */}
+      <section className="row g-3 mb-4 dashboard-financial-grid" aria-label="Financial overview">
         <div className="col-12 col-sm-6 col-xl-3">
-          <div className="stat-card border-start border-4 border-primary">
-            <div className="d-flex align-items-center justify-content-between mb-3">
+          <article className="stat-card dashboard-stat-card border-start border-4 border-primary h-100">
+            <div className="dashboard-stat-heading">
               <span className="stat-title">Current Wallet Balance</span>
               <div className="stat-icon-wrapper bg-primary-subtle text-primary">
-                <Wallet size={22} />
+                <Wallet size={22} aria-hidden="true" />
               </div>
             </div>
             <div className="stat-value text-dark mb-1">
-              ₹{Number(metrics.currentWalletBalance).toLocaleString()}
+              {formatCurrency(metrics.currentWalletBalance)}
             </div>
-            <div className="d-flex align-items-center gap-2 small">
-              <span className="text-success fw-semibold d-flex align-items-center">
-                <ArrowUpRight size={14} /> Reconciled
+            <div className="dashboard-stat-meta">
+              <span className="text-success fw-semibold dashboard-inline-status">
+                <ArrowUpRight size={14} aria-hidden="true" /> Reconciled
               </span>
               <span className="text-secondary">Liquid society funds</span>
             </div>
-          </div>
+          </article>
         </div>
 
-        {/* Maintenance Collected */}
         <div className="col-12 col-sm-6 col-xl-3">
-          <div className="stat-card border-start border-4 border-success">
-            <div className="d-flex align-items-center justify-content-between mb-3">
+          <article className="stat-card dashboard-stat-card border-start border-4 border-success h-100">
+            <div className="dashboard-stat-heading">
               <span className="stat-title">Total Collected</span>
               <div className="stat-icon-wrapper bg-success-subtle text-success">
-                <CreditCard size={22} />
+                <CreditCard size={22} aria-hidden="true" />
               </div>
             </div>
             <div className="stat-value text-dark mb-1">
-              ₹{Number(metrics.totalMaintenanceCollected).toLocaleString()}
+              {formatCurrency(metrics.totalMaintenanceCollected)}
             </div>
-            <div className="d-flex align-items-center gap-2 small">
+            <div className="dashboard-stat-meta">
               <span className="text-success fw-semibold">
                 {metrics.totalMaintenanceCollected > 0 ? "Active Collections" : "0 Payments"}
               </span>
-              <span className="text-secondary">cleared</span>
+              <span className="text-secondary">Cleared</span>
             </div>
-          </div>
+          </article>
         </div>
 
-        {/* Pending Maintenance */}
         <div className="col-12 col-sm-6 col-xl-3">
-          <div className="stat-card border-start border-4 border-danger">
-            <div className="d-flex align-items-center justify-content-between mb-3">
+          <article className="stat-card dashboard-stat-card border-start border-4 border-danger h-100">
+            <div className="dashboard-stat-heading">
               <span className="stat-title">Pending Maintenance</span>
               <div className="stat-icon-wrapper bg-danger-subtle text-danger">
-                <AlertCircle size={22} />
+                <AlertCircle size={22} aria-hidden="true" />
               </div>
             </div>
             <div className="stat-value text-danger mb-1">
-              ₹{Number(metrics.totalPendingDues).toLocaleString()}
+              {formatCurrency(metrics.totalPendingDues)}
             </div>
-            <div className="d-flex align-items-center gap-2 small">
+            <div className="dashboard-stat-meta">
               <span className="text-danger fw-semibold">Reminders active</span>
               <span className="text-secondary">5-day cycle</span>
             </div>
-          </div>
+          </article>
         </div>
 
-        {/* Total Expenses */}
         <div className="col-12 col-sm-6 col-xl-3">
-          <div className="stat-card border-start border-4 border-warning">
-            <div className="d-flex align-items-center justify-content-between mb-3">
+          <article className="stat-card dashboard-stat-card border-start border-4 border-warning h-100">
+            <div className="dashboard-stat-heading">
               <span className="stat-title">Society Expenses</span>
               <div className="stat-icon-wrapper bg-warning-subtle text-warning">
-                <Receipt size={22} />
+                <Receipt size={22} aria-hidden="true" />
               </div>
             </div>
             <div className="stat-value text-dark mb-1">
-              ₹{Number(metrics.totalExpenses).toLocaleString()}
+              {formatCurrency(metrics.totalExpenses)}
             </div>
-            <div className="d-flex align-items-center gap-2 small">
+            <div className="dashboard-stat-meta">
               <span className="text-secondary">Electricity, AMC, Staff</span>
             </div>
-          </div>
+          </article>
         </div>
-      </div>
+      </section>
 
-      {/* Row 2: Masters Count Grid */}
-      <div className="row g-3 mb-4">
+      {/* Society structure overview */}
+      <section className="row g-3 mb-4 dashboard-masters-grid" aria-label="Society occupancy summary">
         <div className="col-6 col-md-3">
-          <div className="p-3 bg-white rounded-3 border d-flex align-items-center gap-3">
-            <div className="p-2 bg-light rounded-2 text-primary">
-              <Layers size={24} />
+          <article className="dashboard-master-card">
+            <div className="dashboard-master-icon text-primary bg-primary-subtle">
+              <Layers size={22} aria-hidden="true" />
             </div>
-            <div>
-              <div className="text-secondary small fw-medium">Total Floors</div>
-              <div className="fs-5 fw-bold text-dark">{metrics.totalFloors} Floors</div>
+            <div className="dashboard-master-copy">
+              <span>Total Floors</span>
+              <strong>{metrics.totalFloors} Floors</strong>
             </div>
-          </div>
-        </div>
-
-        <div className="col-6 col-md-3">
-          <div className="p-3 bg-white rounded-3 border d-flex align-items-center gap-3">
-            <div className="p-2 bg-light rounded-2 text-primary">
-              <Building2 size={24} />
-            </div>
-            <div>
-              <div className="text-secondary small fw-medium">Total Flats</div>
-              <div className="fs-5 fw-bold text-dark">{metrics.totalFlats} Flats</div>
-            </div>
-          </div>
+          </article>
         </div>
 
         <div className="col-6 col-md-3">
-          <div className="p-3 bg-white rounded-3 border d-flex align-items-center gap-3">
-            <div className="p-2 bg-light rounded-2 text-success">
-              <Users size={24} />
+          <article className="dashboard-master-card">
+            <div className="dashboard-master-icon text-primary bg-primary-subtle">
+              <Building2 size={22} aria-hidden="true" />
             </div>
-            <div>
-              <div className="text-secondary small fw-medium">Owner Occupied</div>
-              <div className="fs-5 fw-bold text-dark">{metrics.ownerOccupied} Flats</div>
+            <div className="dashboard-master-copy">
+              <span>Total Flats</span>
+              <strong>{metrics.totalFlats} Flats</strong>
             </div>
-          </div>
+          </article>
         </div>
 
         <div className="col-6 col-md-3">
-          <div className="p-3 bg-white rounded-3 border d-flex align-items-center gap-3">
-            <div className="p-2 bg-light rounded-2 text-warning">
-              <Users size={24} />
+          <article className="dashboard-master-card">
+            <div className="dashboard-master-icon text-success bg-success-subtle">
+              <Users size={22} aria-hidden="true" />
             </div>
-            <div>
-              <div className="text-secondary small fw-medium">Tenant / Rented</div>
-              <div className="fs-5 fw-bold text-dark">{metrics.rentedFlats} Flats</div>
+            <div className="dashboard-master-copy">
+              <span>Owner Occupied</span>
+              <strong>{metrics.ownerOccupied} Flats</strong>
             </div>
-          </div>
+          </article>
         </div>
-      </div>
 
-      {/* Row 3: Recharts Visualizations */}
-      <div className="row g-4 mb-4">
-        {/* Income vs Expenses Bar Chart */}
+        <div className="col-6 col-md-3">
+          <article className="dashboard-master-card">
+            <div className="dashboard-master-icon text-warning bg-warning-subtle">
+              <Users size={22} aria-hidden="true" />
+            </div>
+            <div className="dashboard-master-copy">
+              <span>Tenant / Rented</span>
+              <strong>{metrics.rentedFlats} Flats</strong>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      {/* Charts */}
+      <section className="row g-3 g-xl-4 mb-4 dashboard-charts-grid" aria-label="Financial and occupancy charts">
         <div className="col-12 col-lg-8">
-          <div className="card-premium h-100 p-4">
-            <div className="d-flex align-items-center justify-content-between mb-4">
-              <div>
-                <h5 className="fw-bold text-dark mb-0">Collections vs. Expenses Trends</h5>
-                <span className="small text-secondary">
-                  Monthly maintenance received versus operating expenditures (Starting {currentMonthFull})
-                </span>
+          <article className="card-premium dashboard-chart-card h-100">
+            <div className="dashboard-card-heading">
+              <div className="dashboard-card-heading-copy">
+                <h2>Collections vs. Expenses Trends</h2>
+                <p>Monthly maintenance received versus operating expenditures</p>
               </div>
-              <span className="badge bg-light text-primary border">Starting {currentMonthShort}</span>
+              <span className="dashboard-chart-period">Current: {currentMonthFull}</span>
             </div>
 
-            <div style={{ height: "300px", width: "100%" }}>
+            <div className="dashboard-bar-chart">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyTrends} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <BarChart
+                  data={monthlyTrends}
+                  margin={{ top: 12, right: 8, left: 0, bottom: 4 }}
+                  barGap={6}
+                >
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: "#64748b" }} />
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fontSize: 11, fill: "#64748b" }}
+                    tickLine={false}
+                    axisLine={{ stroke: "#e2e8f0" }}
+                    minTickGap={12}
+                  />
                   <YAxis
-                    tick={{ fontSize: 12, fill: "#64748b" }}
-                    tickFormatter={(v) => (v >= 1000 ? `₹${(v / 1000).toFixed(0)}k` : `₹${v}`)}
+                    width={66}
+                    tick={{ fontSize: 11, fill: "#64748b" }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value) =>
+                      value >= 1000 ? `₹${(value / 1000).toFixed(0)}k` : `₹${value}`
+                    }
                   />
                   <Tooltip
-                    formatter={(val) => [`₹${Number(val).toLocaleString()}`, ""]}
-                    contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }}
+                    formatter={(value) => [formatCurrency(Number(value)), ""]}
+                    contentStyle={{
+                      borderRadius: "10px",
+                      border: "1px solid #e2e8f0",
+                      boxShadow: "0 8px 24px rgba(15, 23, 42, 0.08)",
+                    }}
                   />
-                  <Legend />
-                  <Bar dataKey="collected" name="Maintenance Received" fill="#2563eb" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expenses" name="Society Expenses" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                  <Legend wrapperStyle={{ fontSize: "12px", paddingTop: "8px" }} />
+                  <Bar
+                    dataKey="collected"
+                    name="Maintenance Received"
+                    fill="#2563eb"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={42}
+                  />
+                  <Bar
+                    dataKey="expenses"
+                    name="Society Expenses"
+                    fill="#f59e0b"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={42}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </div>
+          </article>
         </div>
 
-        {/* Payment Methods & Occupancy Pie */}
         <div className="col-12 col-lg-4">
-          <div className="card-premium h-100 p-4">
-            <h5 className="fw-bold text-dark mb-1">Occupancy Distribution</h5>
-            <span className="small text-secondary">Owner occupied vs. tenants</span>
+          <article className="card-premium dashboard-chart-card dashboard-occupancy-card h-100">
+            <div className="dashboard-card-heading dashboard-card-heading-stacked">
+              <div className="dashboard-card-heading-copy">
+                <h2>Occupancy Distribution</h2>
+                <p>Owner occupied vs. tenants</p>
+              </div>
+            </div>
 
-            <div style={{ height: "220px", width: "100%" }} className="my-2">
+            <div className="dashboard-pie-chart">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={occupancyPieData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={55}
-                    outerRadius={80}
+                    innerRadius="55%"
+                    outerRadius="78%"
                     paddingAngle={4}
                     dataKey="value"
                   >
                     {occupancyPieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                      <Cell key={`occupancy-cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v) => [`${v} Flats`, ""]} />
+                  <Tooltip formatter={(value) => [`${value} Flats`, ""]} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
 
-            <div className="d-flex justify-content-center gap-4 pt-2 border-top small">
-              <div className="d-flex align-items-center gap-1.5">
-                <span style={{ width: 10, height: 10, backgroundColor: "#2563eb", borderRadius: "50%" }} />
+            <div className="dashboard-occupancy-legend">
+              <div>
+                <span className="dashboard-legend-dot dashboard-legend-owner" />
                 <span>Owner: <strong>{metrics.ownerOccupied}</strong></span>
               </div>
-              <div className="d-flex align-items-center gap-1.5">
-                <span style={{ width: 10, height: 10, backgroundColor: "#f59e0b", borderRadius: "50%" }} />
+              <div>
+                <span className="dashboard-legend-dot dashboard-legend-tenant" />
                 <span>Tenant: <strong>{metrics.rentedFlats}</strong></span>
               </div>
             </div>
-          </div>
+          </article>
         </div>
-      </div>
+      </section>
 
-      {/* Row 4: Recent Payments Table & Quick Actions */}
-      <div className="row g-4">
+      {/* Recent payments and quick navigation */}
+      <section className="row g-3 g-xl-4 dashboard-bottom-grid">
         <div className="col-12 col-lg-8">
-          <div className="card-premium">
-            <div className="card-premium-header">
-              <div>
-                <h5 className="fw-bold text-dark mb-0">Recent Maintenance Payments</h5>
-                <p className="text-secondary small mb-0">Latest receipts recorded in system</p>
+          <article className="card-premium dashboard-payment-card h-100">
+            <div className="card-premium-header dashboard-table-header">
+              <div className="dashboard-card-heading-copy">
+                <h2>Recent Maintenance Payments</h2>
+                <p>Latest receipts recorded in system</p>
               </div>
               <Link href="/maintenance" className="btn btn-sm btn-outline-primary fw-semibold">
                 View All Payments
               </Link>
             </div>
 
-            <div className="table-responsive">
-              <table className="table table-premium align-middle mb-0">
+            <div className="table-responsive dashboard-table-wrap">
+              <table className="table table-premium align-middle mb-0 dashboard-payments-table">
                 <thead>
                   <tr>
-                    <th>Receipt #</th>
-                    <th>Date</th>
-                    <th>Payment Method</th>
-                    <th>Amount</th>
-                    <th>Status</th>
+                    <th scope="col">Receipt #</th>
+                    <th scope="col">Date</th>
+                    <th scope="col">Payment Method</th>
+                    <th scope="col">Amount</th>
+                    <th scope="col">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -383,15 +443,21 @@ export default function DashboardPage() {
                       </td>
                     </tr>
                   ) : (
-                    recentPayments.map((p) => (
-                      <tr key={p.id}>
-                        <td className="fw-bold text-primary font-monospace">{p.receipt_number}</td>
-                        <td className="text-secondary small">{formatDate(p.payment_date)}</td>
-                        <td>
-                          <span className="badge bg-light text-dark border">{p.payment_method}</span>
+                    recentPayments.map((payment) => (
+                      <tr key={payment.id}>
+                        <td className="fw-bold text-primary font-monospace">
+                          {payment.receipt_number}
                         </td>
-                        <td className="fw-extrabold text-success fs-6">
-                          +₹{Number(p.total_amount_received).toLocaleString()}
+                        <td className="text-secondary small">
+                          {formatDate(payment.payment_date)}
+                        </td>
+                        <td>
+                          <span className="badge bg-light text-dark border">
+                            {payment.payment_method}
+                          </span>
+                        </td>
+                        <td className="fw-bold text-success">
+                          +{formatCurrency(payment.total_amount_received)}
                         </td>
                         <td>
                           <StatusBadge status="PAID" />
@@ -402,77 +468,60 @@ export default function DashboardPage() {
                 </tbody>
               </table>
             </div>
-          </div>
+          </article>
         </div>
 
-        {/* Quick Operations Column */}
         <div className="col-12 col-lg-4">
-          <div className="card-premium p-4">
-            <h6 className="fw-bold text-dark mb-3">Quick Navigation</h6>
-            <div className="d-flex flex-column gap-2">
-              <Link
-                href="/maintenance"
-                className="btn btn-light border text-start d-flex align-items-center gap-3 p-3 rounded-3"
-              >
-                <div className="p-2 bg-primary-subtle text-primary rounded-2">
-                  <CreditCard size={18} />
-                </div>
-                <div>
-                  <div className="fw-bold text-dark small">Collect Maintenance</div>
-                  <div className="text-secondary small" style={{ fontSize: "0.75rem" }}>
-                    Record single or multi-month dues
-                  </div>
-                </div>
-              </Link>
-
-              <Link
-                href="/expenses"
-                className="btn btn-light border text-start d-flex align-items-center gap-3 p-3 rounded-3"
-              >
-                <div className="p-2 bg-warning-subtle text-warning rounded-2">
-                  <Receipt size={18} />
-                </div>
-                <div>
-                  <div className="fw-bold text-dark small">Add Society Expense</div>
-                  <div className="text-secondary small" style={{ fontSize: "0.75rem" }}>
-                    Vendor bill, electricity, staff salary
-                  </div>
-                </div>
-              </Link>
-
-              <Link
-                href="/wallet"
-                className="btn btn-light border text-start d-flex align-items-center gap-3 p-3 rounded-3"
-              >
-                <div className="p-2 bg-success-subtle text-success rounded-2">
-                  <Wallet size={18} />
-                </div>
-                <div>
-                  <div className="fw-bold text-dark small">Society Wallet Ledger</div>
-                  <div className="text-secondary small" style={{ fontSize: "0.75rem" }}>
-                    Opening balance &amp; transaction log
-                  </div>
-                </div>
-              </Link>
-
-              <Link
-                href="/reports"
-                className="btn btn-light border text-start d-flex align-items-center gap-3 p-3 rounded-3"
-              >
-                <div className="p-2 bg-info-subtle text-info rounded-2">
-                  <FileSpreadsheet size={18} />
-                </div>
-                <div>
-                  <div className="fw-bold text-dark small">Reports &amp; Excel Import</div>
-                  <div className="text-secondary small" style={{ fontSize: "0.75rem" }}>
-                    Export PDF / Excel financial statements
-                  </div>
-                </div>
-              </Link>
+          <article className="card-premium dashboard-quick-card h-100">
+            <div className="dashboard-quick-card-heading">
+              <h2>Quick Navigation</h2>
+              <p>Common society operations</p>
             </div>
-          </div>
+
+            <nav className="dashboard-quick-links" aria-label="Quick navigation">
+              <Link href="/maintenance" className="dashboard-quick-link">
+                <span className="dashboard-quick-icon text-primary bg-primary-subtle">
+                  <CreditCard size={18} aria-hidden="true" />
+                </span>
+                <span className="dashboard-quick-copy">
+                  <strong>Collect Maintenance</strong>
+                  <small>Record single or multi-month dues</small>
+                </span>
+              </Link>
+
+              <Link href="/expenses" className="dashboard-quick-link">
+                <span className="dashboard-quick-icon text-warning bg-warning-subtle">
+                  <Receipt size={18} aria-hidden="true" />
+                </span>
+                <span className="dashboard-quick-copy">
+                  <strong>Add Society Expense</strong>
+                  <small>Vendor bill, electricity, staff salary</small>
+                </span>
+              </Link>
+
+              <Link href="/wallet" className="dashboard-quick-link">
+                <span className="dashboard-quick-icon text-success bg-success-subtle">
+                  <Wallet size={18} aria-hidden="true" />
+                </span>
+                <span className="dashboard-quick-copy">
+                  <strong>Society Wallet Ledger</strong>
+                  <small>Opening balance and transaction log</small>
+                </span>
+              </Link>
+
+              <Link href="/reports" className="dashboard-quick-link">
+                <span className="dashboard-quick-icon text-info bg-info-subtle">
+                  <FileSpreadsheet size={18} aria-hidden="true" />
+                </span>
+                <span className="dashboard-quick-copy">
+                  <strong>Reports &amp; Excel Import</strong>
+                  <small>Export PDF / Excel financial statements</small>
+                </span>
+              </Link>
+            </nav>
+          </article>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

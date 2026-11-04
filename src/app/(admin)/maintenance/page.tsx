@@ -501,18 +501,16 @@ export default function MaintenancePage() {
       {/* View Switcher Tabs */}
       <div className="d-flex align-items-center gap-2 mb-3">
         <button
-          className={`btn btn-sm btn-tab ${
-            activeTab === "FLATS" ? "active btn-primary-custom" : ""
-          } px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5`}
+          className={`btn btn-sm btn-tab ${activeTab === "FLATS" ? "active btn-primary-custom" : ""
+            } px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5`}
           onClick={() => setActiveTab("FLATS")}
         >
           <Building size={15} />
           <span>Flats &amp; Invoices Calendar</span>
         </button>
         <button
-          className={`btn btn-sm btn-tab ${
-            activeTab === "PAYMENTS" ? "active btn-primary-custom" : ""
-          } px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5`}
+          className={`btn btn-sm btn-tab ${activeTab === "PAYMENTS" ? "active btn-primary-custom" : ""
+            } px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5`}
           onClick={() => setActiveTab("PAYMENTS")}
         >
           <CreditCard size={15} />
@@ -629,11 +627,10 @@ export default function MaintenancePage() {
                           </td>
                           <td>
                             <span
-                              className={`badge ${
-                                flat.current_resident?.resident_type === "OWNER"
-                                  ? "bg-primary-subtle text-primary border"
-                                  : "bg-warning-subtle text-warning border"
-                              }`}
+                              className={`badge ${flat.current_resident?.resident_type === "OWNER"
+                                ? "bg-primary-subtle text-primary border"
+                                : "bg-warning-subtle text-warning border"
+                                }`}
                             >
                               {flat.current_resident?.resident_type || "N/A"}
                             </span>
@@ -655,12 +652,12 @@ export default function MaintenancePage() {
                                 !currentMonthInv || currentMonthInv.status === "NO_DUES"
                                   ? "NO DUES"
                                   : currentMonthInv.status === "ADVANCE_COVERED"
-                                  ? "ADVANCE"
-                                  : currentMonthInv.status === "UNPAID"
-                                  ? "UNPAID"
-                                  : currentMonthInv.status === "PARTIAL"
-                                  ? "PARTIAL"
-                                  : "PAID"
+                                    ? "ADVANCE"
+                                    : currentMonthInv.status === "UNPAID"
+                                      ? "UNPAID"
+                                      : currentMonthInv.status === "PARTIAL"
+                                        ? "PARTIAL"
+                                        : "PAID"
                               }
                             />
                           </td>
@@ -1181,12 +1178,12 @@ export default function MaintenancePage() {
                                     inv.status === "NO_DUES"
                                       ? "PENDING BILL"
                                       : inv.status === "UNPAID"
-                                      ? "UNPAID"
-                                      : inv.status === "PARTIAL"
-                                      ? "PARTIALLY PAID"
-                                      : inv.status === "PAID"
-                                      ? "PAID"
-                                      : "ADVANCE"
+                                        ? "UNPAID"
+                                        : inv.status === "PARTIAL"
+                                          ? "PARTIALLY PAID"
+                                          : inv.status === "PAID"
+                                            ? "PAID"
+                                            : "ADVANCE"
                                   }
                                 />
                               </td>
