@@ -1,8 +1,18 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { verifySmtpConnection, getSmtpConfig } from "@/lib/email/mailer";
+import { AUTH_COOKIE_NAME, verifySessionToken } from "@/lib/auth/session";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const token = req.cookies.get(AUTH_COOKIE_NAME)?.value;
+    const sessionRes = await verifySessionToken(token);
+    if (!sessionRes.valid) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized: Valid authenticated session required" },
+        { status: 401 }
+      );
+    }
+
     const config = getSmtpConfig();
     const result = await verifySmtpConnection();
 

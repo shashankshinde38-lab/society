@@ -1173,14 +1173,14 @@ export const DataStorage = {
     return users;
   },
 
-  getCurrentUser(): AdminUser {
+  getCurrentUser(): AdminUser | null {
     const users = this.getUsers();
     const stored = getStoredItem<AdminUser | null>("current_user", null);
-    if (stored) {
+    if (stored && stored.email) {
       const match = users.find((u) => u.email.toLowerCase() === stored.email.toLowerCase());
       if (match) return match;
     }
-    return users[0] || initialAdminUsers[0];
+    return null;
   },
 
   setCurrentUser(user: AdminUser | null): void {
@@ -1255,17 +1255,31 @@ export const DataStorage = {
   },
 
   getUserPermissions(userEmail?: string): Record<SystemModuleKey, { create: boolean; read: boolean; update: boolean; delete: boolean }> {
-    const roles = this.getRoles();
-    const superAdminRole = roles.find((r) => r.id === "role-super-admin") || initialRoles[0];
+    const noPermissions: Record<SystemModuleKey, { create: boolean; read: boolean; update: boolean; delete: boolean }> = {
+      dashboard: { create: false, read: false, update: false, delete: false },
+      floors: { create: false, read: false, update: false, delete: false },
+      flats: { create: false, read: false, update: false, delete: false },
+      residents: { create: false, read: false, update: false, delete: false },
+      maintenance: { create: false, read: false, update: false, delete: false },
+      payments: { create: false, read: false, update: false, delete: false },
+      expenses: { create: false, read: false, update: false, delete: false },
+      wallet: { create: false, read: false, update: false, delete: false },
+      mailer: { create: false, read: false, update: false, delete: false },
+      app_setup: { create: false, read: false, update: false, delete: false },
+      reports: { create: false, read: false, update: false, delete: false },
+      users: { create: false, read: false, update: false, delete: false },
+      roles: { create: false, read: false, update: false, delete: false },
+    };
 
-    if (!userEmail) return superAdminRole.permissions;
+    if (!userEmail) return noPermissions;
 
     const users = this.getUsers();
     const user = users.find((u) => u.email.toLowerCase() === userEmail.toLowerCase());
-    if (!user) return superAdminRole.permissions; // Default to admin for main demo user
+    if (!user) return noPermissions;
 
+    const roles = this.getRoles();
     const userRole = roles.find((r) => r.id === user.role_id) || roles.find((r) => r.name === user.role_name);
-    return userRole ? userRole.permissions : superAdminRole.permissions;
+    return userRole ? userRole.permissions : noPermissions;
   },
 
   /**

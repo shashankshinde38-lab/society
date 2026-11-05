@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -14,10 +14,13 @@ import {
   Mail,
   ShieldCheck,
   CheckCircle2,
+  AlertCircle,
+  Clock,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { setAdminSession } from "@/features/auth/authActions";
 import { DataStorage } from "@/services/dataStorage";
+import type { AdminUser } from "@/types/database.types";
 import { toast } from "sonner";
 
 const loginSchema = z.object({
@@ -28,10 +31,14 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
-export default function LoginPage() {
+function LoginFormContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const redirectTarget = searchParams.get("redirect") || "/dashboard";
+  const reason = searchParams.get("reason");
 
   const {
     register,
@@ -63,6 +70,7 @@ export default function LoginPage() {
           setLoading(false);
           return;
         }
+
         // Match user's stored password (or initial default admin@123 if untouched)
         const validPassword = matchedUser.password || "admin@123";
         if (data.password === validPassword) {
@@ -70,9 +78,23 @@ export default function LoginPage() {
             last_login: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
           });
           DataStorage.setCurrentUser(matchedUser);
-          await setAdminSession(matchedUser.email);
-          toast.success(`Welcome, ${matchedUser.name}!`);
-          router.push("/dashboard");
+
+          await setAdminSession({
+            id: matchedUser.id,
+            email: matchedUser.email,
+            roleName: matchedUser.role_name,
+            roleId: matchedUser.role_id,
+          });
+
+          toast.success(`Welcome back, ${matchedUser.name}!`);
+
+          // Validate redirect URL to prevent open-redirect vulnerabilities
+          const safeRedirect =
+            redirectTarget.startsWith("/") && !redirectTarget.startsWith("//")
+              ? redirectTarget
+              : "/dashboard";
+
+          router.push(safeRedirect);
           router.refresh();
           return;
         } else {
@@ -84,9 +106,30 @@ export default function LoginPage() {
 
       // 2. Check default master admin fallback credentials
       if (emailTrimmed === "admin@gmail.com" && data.password === "admin@123") {
-        await setAdminSession("admin@gmail.com");
-        toast.success("Welcome, Administrator! Redirecting to dashboard...");
-        router.push("/dashboard");
+        const defaultAdmin: AdminUser = {
+          id: "usr-super-admin",
+          name: "Super Admin",
+          email: "admin@gmail.com",
+          role_id: "role-super-admin",
+          role_name: "Super Admin",
+          status: "ACTIVE",
+          last_login: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        };
+        DataStorage.setCurrentUser(defaultAdmin);
+
+        await setAdminSession({
+          id: defaultAdmin.id,
+          email: defaultAdmin.email,
+          roleName: defaultAdmin.role_name,
+        });
+
+        toast.success("Welcome, Administrator! Redirecting...");
+        const safeRedirect =
+          redirectTarget.startsWith("/") && !redirectTarget.startsWith("//")
+            ? redirectTarget
+            : "/dashboard";
+        router.push(safeRedirect);
         router.refresh();
         return;
       }
@@ -105,9 +148,33 @@ export default function LoginPage() {
       }
 
       if (authData?.user) {
-        await setAdminSession(authData.user.email || data.email);
-        toast.success("Welcome back! Redirecting to dashboard...");
-        router.push("/dashboard");
+        const userEmail = authData.user.email || data.email;
+        const matchingUser: AdminUser = registeredUsers.find((u) => u.email.toLowerCase() === userEmail.toLowerCase()) || {
+          id: authData.user.id,
+          name: userEmail.split("@")[0],
+          email: userEmail,
+          role_id: "role-super-admin",
+          role_name: "Super Admin",
+          status: "ACTIVE",
+          last_login: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        };
+
+        DataStorage.setCurrentUser(matchingUser);
+
+        await setAdminSession({
+          id: matchingUser.id,
+          email: matchingUser.email,
+          roleName: matchingUser.role_name,
+          roleId: matchingUser.role_id,
+        });
+
+        toast.success("Welcome back! Redirecting...");
+        const safeRedirect =
+          redirectTarget.startsWith("/") && !redirectTarget.startsWith("//")
+            ? redirectTarget
+            : "/dashboard";
+        router.push(safeRedirect);
         router.refresh();
       }
     } catch (err: unknown) {
@@ -165,7 +232,7 @@ export default function LoginPage() {
                 </div>
                 <div className="d-flex align-items-center gap-2">
                   <CheckCircle2 size={16} className="text-success" />
-                  <span>Secured with Supabase Row Level Security</span>
+                  <span>Automated 30-min idle & 8-hour session expiration</span>
                 </div>
               </div>
             </div>
@@ -187,6 +254,26 @@ export default function LoginPage() {
               <p className="text-secondary small">
                 Enter your administrative credentials to manage society records
               </p>
+
+              {/* Informative Session Expiration Notifications */}
+              {reason === "idle" && (
+                <div className="alert alert-warning small d-flex align-items-center gap-2 mt-3 mb-0 border-warning-subtle py-2.5">
+                  <Clock size={16} className="text-warning flex-shrink-0" />
+                  <span>Your session expired due to 30 minutes of inactivity. Please log in again.</span>
+                </div>
+              )}
+              {reason === "expired" && (
+                <div className="alert alert-warning small d-flex align-items-center gap-2 mt-3 mb-0 border-warning-subtle py-2.5">
+                  <AlertCircle size={16} className="text-warning flex-shrink-0" />
+                  <span>Your session has expired. Please enter your credentials again.</span>
+                </div>
+              )}
+              {reason === "unauthorized" && (
+                <div className="alert alert-danger small d-flex align-items-center gap-2 mt-3 mb-0 border-danger-subtle py-2.5">
+                  <AlertCircle size={16} className="text-danger flex-shrink-0" />
+                  <span>Authentication required. Please sign in to access that protected page.</span>
+                </div>
+              )}
             </div>
 
             <form onSubmit={handleSubmit(onSubmit)} noValidate>
@@ -202,8 +289,9 @@ export default function LoginPage() {
                   <input
                     type="email"
                     {...register("email")}
-                    className={`form-control border-start-0 ps-0 ${errors.email ? "is-invalid" : ""
-                      }`}
+                    className={`form-control border-start-0 ps-0 ${
+                      errors.email ? "is-invalid" : ""
+                    }`}
                     placeholder="name@parijatsociety.org"
                     disabled={loading}
                   />
@@ -233,8 +321,9 @@ export default function LoginPage() {
                   <input
                     type={showPassword ? "text" : "password"}
                     {...register("password")}
-                    className={`form-control border-start-0 border-end-0 ps-0 ${errors.password ? "is-invalid" : ""
-                      }`}
+                    className={`form-control border-start-0 border-end-0 ps-0 ${
+                      errors.password ? "is-invalid" : ""
+                    }`}
                     placeholder="Enter password"
                     disabled={loading}
                   />
@@ -288,17 +377,26 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <div className="pt-3 border-top text-center">
-              <span className="text-secondary small">
-                {/* Society Setup & Configuration:{" "} */}
-                {/* <Link href="/app-setup" className="text-primary fw-semibold text-decoration-none">
-                  App Setup Page
-                </Link> */}
-              </span>
+            <div className="pt-3 border-top text-center text-muted small">
+              Parijat Cooperative Housing Society &bull; Secure Authentication
             </div>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-vh-100 d-flex align-items-center justify-content-center bg-light">
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    }>
+      <LoginFormContent />
+    </Suspense>
   );
 }

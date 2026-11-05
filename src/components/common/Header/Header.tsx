@@ -37,17 +37,25 @@ export const Header: React.FC<HeaderProps> = ({
   const supabase = createClient();
 
   const activeEmail = currentUser?.email || userEmail || "admin@gmail.com";
-  const activeName = currentUser?.name || (currentUser?.role_name === "Accountant" ? "Pratik Mohol" : "Super Admin");
-  const activeRole = currentUser?.role_name || "Super Admin";
+  const activeName = currentUser?.name || (currentUser?.role_name === "Accountant" ? "Pratik Mohol" : "Administrator");
+  const activeRole = currentUser?.role_name || "Admin";
 
   const handleSignOut = async () => {
     try {
       DataStorage.setCurrentUser(null);
       await clearAdminSession();
-      await supabase.auth.signOut();
+      try {
+        await fetch("/api/auth/session", { method: "DELETE" });
+      } catch {
+        // Ignore
+      }
+      try {
+        await supabase.auth.signOut();
+      } catch {
+        // Ignore
+      }
       toast.success("Signed out successfully");
-      router.push("/login");
-      router.refresh();
+      window.location.replace("/login");
     } catch {
       toast.error("Failed to sign out");
     }

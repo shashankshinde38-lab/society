@@ -1,11 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Sidebar } from "@/components/common/Sidebar/Sidebar";
 import { Header } from "@/components/common/Header/Header";
-import { createClient } from "@/lib/supabase/client";
-import { DataStorage } from "@/services/dataStorage";
-import { AdminUser } from "@/types/database.types";
+import { useSessionGuard } from "@/hooks/useSessionGuard";
+import { Building2 } from "lucide-react";
 
 export default function AdminLayout({
   children,
@@ -14,25 +13,26 @@ export default function AdminLayout({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [userEmail, setUserEmail] = useState<string | null>("admin@gmail.com");
-  const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
 
-  useEffect(() => {
-    // 1. Prioritize active DataStorage session
-    const current = DataStorage.getCurrentUser();
-    if (current) {
-      setCurrentUser(current);
-      setUserEmail(current.email);
-    }
+  const { isVerifying, currentUser, userEmail } = useSessionGuard();
 
-    // 2. Sync with Supabase Auth if session exists
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user?.email && !current) {
-        setUserEmail(user.email);
-      }
-    });
-  }, []);
+  // Strict Protection: Do not render any protected content while verifying session
+  if (isVerifying) {
+    return (
+      <div className="min-vh-100 d-flex flex-column align-items-center justify-content-center bg-light">
+        <div className="p-4 bg-white rounded-4 shadow-sm text-center border" style={{ maxWidth: "340px", width: "90%" }}>
+          <div className="bg-primary text-white p-3 rounded-circle d-inline-flex mb-3">
+            <Building2 size={32} />
+          </div>
+          <h6 className="fw-bold text-dark mb-1">Parijat Society ERP</h6>
+          <p className="small text-muted mb-3">Verifying secure session...</p>
+          <div className="spinner-border spinner-border-sm text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-shell">

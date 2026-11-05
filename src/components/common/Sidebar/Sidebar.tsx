@@ -257,7 +257,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   style={{ width: "8px", height: "8px" }}
                 />
                 <span className="text-secondary small" style={{ fontSize: "0.75rem" }}>
-                  {currentUser?.role_name || "Super Admin"} Active
+                  {currentUser?.role_name || "Admin"} Active
                 </span>
               </div>
             </div>

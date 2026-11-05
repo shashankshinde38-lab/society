@@ -6,9 +6,20 @@ import {
   generatePaymentReceiptHtml,
   EmailAttachment,
 } from "@/lib/email/mailer";
+import { AUTH_COOKIE_NAME, verifySessionToken } from "@/lib/auth/session";
 
 export async function POST(req: NextRequest) {
   try {
+    // Verify active authenticated session
+    const token = req.cookies.get(AUTH_COOKIE_NAME)?.value;
+    const sessionRes = await verifySessionToken(token);
+    if (!sessionRes.valid) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized: Valid authenticated session required", code: sessionRes.reason },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const {
       type,
