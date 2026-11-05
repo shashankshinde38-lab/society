@@ -42,7 +42,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   );
 
   const permissions = DataStorage.getUserPermissions(currentUser?.email);
-  const canReadUsers = permissions.users ? permissions.users.read : true;
+  const canAccessRolesAndUsers = Boolean(
+    (permissions.roles && permissions.roles.read) ||
+    (permissions.users && permissions.users.read) ||
+    currentUser?.role_name === "Super Admin"
+  );
   const canReadSetup = permissions.app_setup ? permissions.app_setup.read : true;
 
   const isActive = (path: string) => pathname === path;
@@ -219,15 +223,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!collapsed && <span>Mailer</span>}
           </Link>
 
-          {canReadUsers && (
+          {canAccessRolesAndUsers && (
             <Link
-              href="/users"
-              className={`sidebar-nav-item ${isActive("/users") ? "active" : ""}`}
-              title="Admin Users & Roles"
+              href="/roles-permissions"
+              className={`sidebar-nav-item ${
+                isActive("/roles-permissions") || isActive("/users") ? "active" : ""
+              }`}
+              title="Roles & Permissions"
               onClick={onCloseMobile}
             >
               <ShieldCheck className="nav-icon" />
-              {!collapsed && <span>Admin Users</span>}
+              {!collapsed && <span>Roles &amp; Permissions</span>}
             </Link>
           )}
 

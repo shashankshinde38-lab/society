@@ -17,6 +17,7 @@ import {
   EmailLog,
   Role,
   AdminUser,
+  ModulePermission,
   SystemModuleKey,
 } from "@/types/database.types";
 
@@ -1102,7 +1103,18 @@ export const DataStorage = {
 
   // --- RBAC: ROLES & PERMISSIONS ---
   getRoles(): Role[] {
-    return getStoredItem("admin_roles", initialRoles);
+    const roles = getStoredItem<Role[]>("admin_roles", initialRoles);
+    let updated = false;
+    roles.forEach((r) => {
+      if (!r.status) {
+        r.status = "ACTIVE";
+        updated = true;
+      }
+    });
+    if (updated) {
+      setStoredItem("admin_roles", roles);
+    }
+    return roles;
   },
   addRole(roleData: Omit<Role, "id" | "created_at" | "updated_at">): Role {
     const roles = this.getRoles();
@@ -1112,6 +1124,7 @@ export const DataStorage = {
     const newRole: Role = {
       ...roleData,
       name: roleData.name.trim(),
+      status: roleData.status || "ACTIVE",
       id: "role-" + Date.now(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -1130,26 +1143,74 @@ export const DataStorage = {
       throw new Error("Cannot rename the system Super Admin role");
     }
 
+    const oldName = roles[idx].name;
     roles[idx] = { ...roles[idx], ...data, updated_at: new Date().toISOString() };
     setStoredItem("admin_roles", roles);
+
+    // If role name was updated, synchronize all assigned users
+    if (data.name && data.name !== oldName) {
+      const users = this.getUsers();
+      let usersChanged = false;
+      users.forEach((u) => {
+        if (u.role_id === id) {
+          u.role_name = data.name!;
+          usersChanged = true;
+        }
+      });
+      if (usersChanged) {
+        setStoredItem("admin_users", users);
+      }
+    }
+
     return roles[idx];
   },
-  deleteRole(id: string): void {
+  deleteRole(id: string, reassignToRoleId?: string): void {
     const roles = this.getRoles();
     const role = roles.find((r) => r.id === id);
     if (!role) throw new Error("Role not found");
     if (role.is_system || role.id === "role-super-admin") {
-      throw new Error("System roles cannot be deleted");
+      throw new Error("System Super Admin role cannot be deleted");
     }
 
     const users = this.getUsers();
-    const inUse = users.some((u) => u.role_id === id);
-    if (inUse) {
-      throw new Error(`Cannot delete role "${role.name}" because it is currently assigned to active users. Reassign users first.`);
+    const assignedUsers = users.filter((u) => u.role_id === id || u.role_name === role.name);
+    if (assignedUsers.length > 0) {
+      if (!reassignToRoleId) {
+        throw new Error(`Cannot delete role "${role.name}" because ${assignedUsers.length} user(s) are assigned to it. Please reassign them to another active role first.`);
+      }
+      const targetRole = roles.find((r) => r.id === reassignToRoleId);
+      if (!targetRole) {
+        throw new Error("Target role for reassignment was not found");
+      }
+      assignedUsers.forEach((u) => {
+        u.role_id = targetRole.id;
+        u.role_name = targetRole.name;
+      });
+      setStoredItem("admin_users", users);
     }
 
     const filtered = roles.filter((r) => r.id !== id);
     setStoredItem("admin_roles", filtered);
+  },
+  reassignUsersRole(fromRoleId: string, toRoleId: string): number {
+    const roles = this.getRoles();
+    const fromRole = roles.find((r) => r.id === fromRoleId);
+    const toRole = roles.find((r) => r.id === toRoleId);
+    if (!toRole) throw new Error("Target role not found");
+
+    const users = this.getUsers();
+    let count = 0;
+    users.forEach((u) => {
+      if (u.role_id === fromRoleId || (fromRole && u.role_name === fromRole.name)) {
+        u.role_id = toRole.id;
+        u.role_name = toRole.name;
+        count++;
+      }
+    });
+    if (count > 0) {
+      setStoredItem("admin_users", users);
+    }
+    return count;
   },
 
   // --- RBAC: ADMIN USERS ---
@@ -1254,21 +1315,21 @@ export const DataStorage = {
     setStoredItem("admin_users", filtered);
   },
 
-  getUserPermissions(userEmail?: string): Record<SystemModuleKey, { create: boolean; read: boolean; update: boolean; delete: boolean }> {
-    const noPermissions: Record<SystemModuleKey, { create: boolean; read: boolean; update: boolean; delete: boolean }> = {
-      dashboard: { create: false, read: false, update: false, delete: false },
-      floors: { create: false, read: false, update: false, delete: false },
-      flats: { create: false, read: false, update: false, delete: false },
-      residents: { create: false, read: false, update: false, delete: false },
-      maintenance: { create: false, read: false, update: false, delete: false },
-      payments: { create: false, read: false, update: false, delete: false },
-      expenses: { create: false, read: false, update: false, delete: false },
-      wallet: { create: false, read: false, update: false, delete: false },
-      mailer: { create: false, read: false, update: false, delete: false },
-      app_setup: { create: false, read: false, update: false, delete: false },
-      reports: { create: false, read: false, update: false, delete: false },
-      users: { create: false, read: false, update: false, delete: false },
-      roles: { create: false, read: false, update: false, delete: false },
+  getUserPermissions(userEmail?: string): Record<string, ModulePermission> {
+    const noPermissions: Record<string, ModulePermission> = {
+      dashboard: { read: false, create: false, update: false, delete: false },
+      floors: { read: false, create: false, update: false, delete: false },
+      flats: { read: false, create: false, update: false, delete: false },
+      residents: { read: false, create: false, update: false, delete: false },
+      maintenance: { read: false, create: false, update: false, delete: false },
+      payments: { read: false, create: false, update: false, delete: false },
+      expenses: { read: false, create: false, update: false, delete: false },
+      wallet: { read: false, create: false, update: false, delete: false },
+      reports: { read: false, create: false, update: false, delete: false },
+      mailer: { read: false, create: false, update: false, delete: false },
+      app_setup: { read: false, create: false, update: false, delete: false },
+      roles: { read: false, create: false, update: false, delete: false },
+      users: { read: false, create: false, update: false, delete: false },
     };
 
     if (!userEmail) return noPermissions;
@@ -1280,6 +1341,14 @@ export const DataStorage = {
     const roles = this.getRoles();
     const userRole = roles.find((r) => r.id === user.role_id) || roles.find((r) => r.name === user.role_name);
     return userRole ? userRole.permissions : noPermissions;
+  },
+
+  hasUserPermission(userEmail?: string, module?: string, action: string = "read"): boolean {
+    if (!userEmail || !module) return false;
+    const perms = this.getUserPermissions(userEmail);
+    const modPerm = perms[module];
+    if (!modPerm) return false;
+    return Boolean((modPerm as any)[action]);
   },
 
   /**

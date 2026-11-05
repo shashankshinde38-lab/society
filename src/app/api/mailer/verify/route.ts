@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySmtpConnection, getSmtpConfig } from "@/lib/email/mailer";
 import { AUTH_COOKIE_NAME, verifySessionToken } from "@/lib/auth/session";
+import { verifyServerPermission } from "@/lib/auth/rbacServer";
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,6 +11,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(
         { success: false, message: "Unauthorized: Valid authenticated session required" },
         { status: 401 }
+      );
+    }
+
+    const authCheck = verifyServerPermission(sessionRes.session, "mailer", "read");
+    if (!authCheck.authorized) {
+      return NextResponse.json(
+        { success: false, message: authCheck.error },
+        { status: authCheck.status }
       );
     }
 

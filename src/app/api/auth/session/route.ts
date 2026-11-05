@@ -78,3 +78,4 @@ export async function DELETE() {
   response.cookies.delete(LEGACY_COOKIE_NAME);
   return response;
 }
+

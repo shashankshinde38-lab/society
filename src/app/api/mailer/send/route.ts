@@ -7,6 +7,7 @@ import {
   EmailAttachment,
 } from "@/lib/email/mailer";
 import { AUTH_COOKIE_NAME, verifySessionToken } from "@/lib/auth/session";
+import { verifyServerPermission } from "@/lib/auth/rbacServer";
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,6 +18,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, message: "Unauthorized: Valid authenticated session required", code: sessionRes.reason },
         { status: 401 }
+      );
+    }
+
+    // RBAC: Verify mailer send permission
+    const authCheck = verifyServerPermission(sessionRes.session, "mailer", "send");
+    if (!authCheck.authorized) {
+      return NextResponse.json(
+        { success: false, message: authCheck.error },
+        { status: authCheck.status }
       );
     }
 

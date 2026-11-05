@@ -247,10 +247,17 @@ export interface DashboardMetrics {
 
 // RBAC Permissions System
 export type ModulePermission = {
-  create: boolean;
   read: boolean;
+  create: boolean;
   update: boolean;
   delete: boolean;
+  export?: boolean;
+  approve?: boolean;
+  collect?: boolean;
+  send?: boolean;
+  reset?: boolean;
+  retry?: boolean;
+  assign?: boolean;
 };
 
 export type SystemModuleKey =
@@ -262,18 +269,19 @@ export type SystemModuleKey =
   | "payments"
   | "expenses"
   | "wallet"
+  | "reports"
   | "mailer"
   | "app_setup"
-  | "reports"
-  | "users"
-  | "roles";
+  | "roles"
+  | "users";
 
 export interface Role {
   id: string;
   name: string;
   description: string | null;
   is_system: boolean;
-  permissions: Record<SystemModuleKey, ModulePermission>;
+  status?: "ACTIVE" | "INACTIVE";
+  permissions: Record<string, ModulePermission>;
   created_at: string;
   updated_at: string;
 }
@@ -282,6 +290,8 @@ export interface AdminUser {
   id: string;
   name: string;
   email: string;
+  mobile?: string;
+  phone?: string;
   password?: string;
   role_id: string;
   role_name: string;
