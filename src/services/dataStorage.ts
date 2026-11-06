@@ -31,13 +31,14 @@ import {
   initialExpenses,
   initialPayments,
   initialWalletTransactions,
+  initialInvoices,
   initialRoles,
   initialAdminUsers,
   initialEmailLogs,
 } from "./mockInitialData";
 import { getValidDueDate } from "@/utils/dateFormatter";
 
-const STORAGE_KEY_PREFIX = "parijat_erp_v6_";
+const STORAGE_KEY_PREFIX = "parijat_erp_v7_";
 
 // One-time auto-clean of any legacy cache keys to ensure completely fresh truncated live state
 if (typeof window !== "undefined") {
@@ -349,7 +350,7 @@ export const DataStorage = {
     const flat = this.getFlats().find((f) => f.id === flatId);
     if (!flat) return;
     const currentRate = this.getFlatMaintenanceRate(flat);
-    const invoices = getStoredItem<MaintenanceInvoice[]>("invoices", []);
+    const invoices = getStoredItem<MaintenanceInvoice[]>("invoices", initialInvoices);
     let modified = false;
 
     invoices.forEach((inv) => {
@@ -430,7 +431,7 @@ export const DataStorage = {
     setStoredItem("flats", rawFlats);
 
     // 3. Remove only UNPAID/NO_DUES invoices for this flat (preserve any paid invoice records)
-    const rawInvoices = getStoredItem<MaintenanceInvoice[]>("invoices", []);
+    const rawInvoices = getStoredItem<MaintenanceInvoice[]>("invoices", initialInvoices);
     const updatedInvoices = rawInvoices.filter((i) => !(i.flat_id === id && i.status !== "PAID"));
     setStoredItem("invoices", updatedInvoices);
 
@@ -661,7 +662,7 @@ export const DataStorage = {
 
     if (!flatId) return year;
 
-    const rawInvoices = getStoredItem<MaintenanceInvoice[]>("invoices", []);
+    const rawInvoices = getStoredItem<MaintenanceInvoice[]>("invoices", initialInvoices);
 
     while (true) {
       const decInv = rawInvoices.find(
@@ -686,7 +687,7 @@ export const DataStorage = {
 
   getInvoices(flatId?: string, year?: number): MaintenanceInvoice[] {
     const resolvedYear = year || (flatId ? this.getFlatActiveMaintenanceYear(flatId) : (typeof window !== "undefined" ? new Date().getFullYear() : 2026));
-    const rawInvoices = getStoredItem<MaintenanceInvoice[]>("invoices", []);
+    const rawInvoices = getStoredItem<MaintenanceInvoice[]>("invoices", initialInvoices);
     const flats = getStoredItem<Flat[]>("flats", initialFlats);
     const settings = this.getSettings();
     const defaultRate = settings.monthly_amount || 1100;

@@ -8,10 +8,20 @@ import {
   WalletTransaction,
   Society,
   MaintenancePayment,
+  MaintenanceInvoice,
   Role,
   AdminUser,
   EmailLog,
 } from "@/types/database.types";
+import {
+  seededFloors,
+  seededFlats,
+  seededResidents,
+  seededExpenses,
+  seededPayments,
+  seededWalletTransactions,
+  seededInvoices,
+} from "./historicalSeeder";
 
 export const initialSociety: Society = {
   id: "soc-parijat-a-wing",
@@ -52,13 +62,14 @@ export const initialSettings: MaintenanceSettings = {
   updated_at: "2026-04-01T00:00:00Z",
 };
 
-// All dummy data cleared out - start fresh!
-export const initialFloors: Floor[] = [];
-export const initialFlats: Flat[] = [];
-export const initialResidents: Resident[] = [];
-export const initialExpenses: SocietyExpense[] = [];
-export const initialPayments: MaintenancePayment[] = [];
-export const initialWalletTransactions: WalletTransaction[] = [];
+// Historical dataset loaded from 15 monthly record sheets (Sep 2025 - Nov 2026)
+export const initialFloors: Floor[] = seededFloors;
+export const initialFlats: Flat[] = seededFlats;
+export const initialResidents: Resident[] = seededResidents;
+export const initialExpenses: SocietyExpense[] = seededExpenses;
+export const initialPayments: MaintenancePayment[] = seededPayments;
+export const initialWalletTransactions: WalletTransaction[] = seededWalletTransactions;
+export const initialInvoices: MaintenanceInvoice[] = seededInvoices;
 
 export const initialCategories: ExpenseCategory[] = [
   { id: "cat-1", name: "Electricity Bill (MSEDCL)", description: "Common area, lift, motor pump", is_active: true, created_at: "2026-04-01" },
