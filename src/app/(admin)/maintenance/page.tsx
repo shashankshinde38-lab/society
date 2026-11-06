@@ -477,10 +477,27 @@ export default function MaintenancePage() {
 
     const flatYearInvs = invoices.filter((i) => i.flat_id === flat.id && i.year === selectedYear);
     const flatYearDue = flatYearInvs.reduce((sum, i) => sum + Number(i.due_amount || 0), 0);
+    const flatYearPaid = flatYearInvs.reduce((sum, i) => sum + Number(i.paid_amount || 0), 0);
 
     let matchesStatus = true;
-    if (statusFilter === "PAID") matchesStatus = flatYearDue === 0;
-    if (statusFilter === "UNPAID") matchesStatus = flatYearDue > 0;
+    if (statusFilter === "PAID") {
+      if (selectedYear === 2026) {
+        const curM = new Date().getMonth() + 1;
+        const curInv = flatYearInvs.find((i) => i.month === curM);
+        matchesStatus = curInv ? (curInv.status === "PAID" || curInv.status === "ADVANCE_COVERED") : flatYearDue === 0 && flatYearPaid > 0;
+      } else {
+        matchesStatus = flatYearPaid > 0 && flatYearDue === 0;
+      }
+    }
+    if (statusFilter === "UNPAID") {
+      if (selectedYear === 2026) {
+        const curM = new Date().getMonth() + 1;
+        const curInv = flatYearInvs.find((i) => i.month === curM);
+        matchesStatus = curInv ? (curInv.status === "UNPAID" || curInv.status === "PARTIAL") : flatYearDue > 0;
+      } else {
+        matchesStatus = flatYearDue > 0;
+      }
+    }
 
     return matchesSearch && matchesFloor && matchesType && matchesStatus;
   });
@@ -494,10 +511,10 @@ export default function MaintenancePage() {
 
   const totalFlatsCount = flats.length;
   const paidFlatsCount = flats.filter((f) => {
-    const dues = yearInvoices
-      .filter((i) => i.flat_id === f.id)
-      .reduce((sum, i) => sum + Number(i.due_amount || 0), 0);
-    return dues === 0;
+    const fInvs = yearInvoices.filter((i) => i.flat_id === f.id);
+    const dues = fInvs.reduce((sum, i) => sum + Number(i.due_amount || 0), 0);
+    const paid = fInvs.reduce((sum, i) => sum + Number(i.paid_amount || 0), 0);
+    return paid > 0 && dues === 0;
   }).length;
   const unpaidFlatsCount = flats.filter((f) => {
     const dues = yearInvoices
@@ -523,20 +540,23 @@ export default function MaintenancePage() {
                 Cycle:
               </span>
               <div className="btn-group btn-group-sm" role="group">
-                {AVAILABLE_YEARS.map((yr) => (
-                  <button
-                    key={yr}
-                    type="button"
-                    className={`btn btn-sm ${
-                      selectedYear === yr
-                        ? "btn-primary-custom fw-bold shadow-sm"
-                        : "btn-light text-secondary"
-                    } px-3 py-1`}
-                    onClick={() => setSelectedYear(yr)}
-                  >
-                    {yr}
-                  </button>
-                ))}
+                {AVAILABLE_YEARS.map((yr) => {
+                  const tag = yr < 2026 ? "History" : yr === 2026 ? "Active" : "Upcoming";
+                  return (
+                    <button
+                      key={yr}
+                      type="button"
+                      className={`btn btn-sm ${
+                        selectedYear === yr
+                          ? "btn-primary-custom fw-bold shadow-sm"
+                          : "btn-light text-secondary"
+                      } px-3 py-1`}
+                      onClick={() => setSelectedYear(yr)}
+                    >
+                      {yr} <span className="small opacity-75 fw-normal">({tag})</span>
+                    </button>
+                  );
+                })}
               </div>
               {isLeapYear(selectedYear) && (
                 <span className="badge bg-primary-subtle text-primary border ms-2 me-1 py-1 px-2 small">
@@ -555,7 +575,13 @@ export default function MaintenancePage() {
             <div className="stat-title">Total Collected ({selectedYear})</div>
             <div className="stat-value text-success">₹{totalCollectedSum.toLocaleString()}</div>
             <div className="small text-secondary mt-1">
-              <span className="fw-bold text-dark">{paidFlatsCount}</span> of {totalFlatsCount} Flats Paid
+              {selectedYear > 2026 && totalCollectedSum === 0 ? (
+                <span className="text-muted">Upcoming Cycle &bull; ₹0 Collected</span>
+              ) : (
+                <>
+                  <span className="fw-bold text-dark">{paidFlatsCount}</span> of {totalFlatsCount} Flats Paid
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -565,7 +591,13 @@ export default function MaintenancePage() {
             <div className="stat-title">Total Pending Dues ({selectedYear})</div>
             <div className="stat-value text-danger">₹{totalPendingSum.toLocaleString()}</div>
             <div className="small text-secondary mt-1">
-              <span className="fw-bold text-danger">{unpaidFlatsCount}</span> Flats with Dues
+              {selectedYear > 2026 && totalPendingSum === 0 ? (
+                <span className="text-muted">Billing not started yet</span>
+              ) : (
+                <>
+                  <span className="fw-bold text-danger">{unpaidFlatsCount}</span> Flats with Dues
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -663,11 +695,14 @@ export default function MaintenancePage() {
                   onChange={(e) => setSelectedYear(Number(e.target.value))}
                   title="Filter by Year Cycle"
                 >
-                  {AVAILABLE_YEARS.map((yr) => (
-                    <option key={yr} value={yr}>
-                      Year {yr} {yr === 2026 && isLeapYear(yr) ? "(Leap Year)" : ""}
-                    </option>
-                  ))}
+                  {AVAILABLE_YEARS.map((yr) => {
+                    const tag = yr < 2026 ? "Historical" : yr === 2026 ? "Active" : "Upcoming";
+                    return (
+                      <option key={yr} value={yr}>
+                        Year {yr} ({tag}) {yr === 2026 && isLeapYear(yr) ? "• Leap Year" : ""}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -689,7 +724,7 @@ export default function MaintenancePage() {
                     <th>Type</th>
                     <th>Monthly Rate</th>
                     <th>Outstanding Dues</th>
-                    <th>Current Month</th>
+                    <th>{selectedYear === 2026 ? "Current Month" : `${selectedYear} Status`}</th>
                     <th className="text-end">Actions</th>
                   </tr>
                 </thead>
@@ -709,7 +744,10 @@ export default function MaintenancePage() {
                         (sum, i) => sum + Number(i.due_amount || 0),
                         0
                       );
-                      const isClear = flatYearDue === 0;
+                      const flatYearPaid = flatYearInvs.reduce(
+                        (sum, i) => sum + Number(i.paid_amount || 0),
+                        0
+                      );
 
                       const currentMonthNum = new Date().getMonth() + 1;
                       const currentMonthInv = invoices.find(
@@ -760,8 +798,10 @@ export default function MaintenancePage() {
                             </div>
                           </td>
                           <td>
-                            {!isClear ? (
+                            {flatYearDue > 0 ? (
                               <span className="fw-bold text-danger">₹{flatYearDue.toLocaleString()}</span>
+                            ) : selectedYear > 2026 && flatYearPaid === 0 ? (
+                              <span className="text-muted small">₹0 <span className="opacity-75">(Upcoming)</span></span>
                             ) : (
                               <span className="text-success small fw-semibold">₹0</span>
                             )}
@@ -782,10 +822,38 @@ export default function MaintenancePage() {
                                           : "PAID"
                                 }
                               />
+                            ) : selectedYear > 2026 ? (
+                              flatYearPaid > 0 && flatYearDue === 0 ? (
+                                <StatusBadge
+                                  status="PAID"
+                                  label={`${selectedYear} ADVANCE PAID`}
+                                />
+                              ) : flatYearPaid > 0 && flatYearDue > 0 ? (
+                                <StatusBadge
+                                  status="PARTIAL"
+                                  label={`${selectedYear} PARTIAL (₹${flatYearPaid.toLocaleString()})`}
+                                />
+                              ) : flatYearDue > 0 ? (
+                                <StatusBadge
+                                  status="UNPAID"
+                                  label={`${selectedYear} PENDING (₹${flatYearDue.toLocaleString()})`}
+                                />
+                              ) : (
+                                <span className="badge bg-secondary-subtle text-secondary border fw-normal py-1 px-2">
+                                  UPCOMING &bull; NOT BILLED
+                                </span>
+                              )
                             ) : (
+                              /* Historical year e.g. 2025 */
                               <StatusBadge
-                                status={isClear ? "PAID" : "UNPAID"}
-                                label={isClear ? `${selectedYear} ALL PAID` : `${selectedYear} PENDING (₹${flatYearDue})`}
+                                status={flatYearDue > 0 ? "UNPAID" : flatYearPaid > 0 ? "PAID" : "NO_DUES"}
+                                label={
+                                  flatYearDue > 0
+                                    ? `${selectedYear} PENDING (₹${flatYearDue.toLocaleString()})`
+                                    : flatYearPaid > 0
+                                      ? `${selectedYear} ALL PAID`
+                                      : "NO RECORDS"
+                                }
                               />
                             )}
                           </td>
@@ -796,7 +864,11 @@ export default function MaintenancePage() {
                               title={`Annual Maintenance Collection & 12-Month Ledger for ${selectedYear}`}
                             >
                               <Calendar size={14} />
-                              <span>Annual Collection ({selectedYear})</span>
+                              <span>
+                                {selectedYear > 2026
+                                  ? `Matrix (${selectedYear})`
+                                  : `Annual Collection (${selectedYear})`}
+                              </span>
                             </button>
                           </td>
                         </tr>
@@ -1229,28 +1301,31 @@ export default function MaintenancePage() {
                         Annual Maintenance Collection &mdash; Flat {selectedFlatForMatrix.flat_number} ({selectedYear})
                       </h5>
                       <div className="btn-group btn-group-sm shadow-sm" role="group">
-                        {AVAILABLE_YEARS.map((yr) => (
-                          <button
-                            key={yr}
-                            type="button"
-                            className={`btn btn-sm ${
-                              selectedYear === yr
-                                ? "btn-primary text-white fw-bold shadow-sm"
-                                : "btn-light text-secondary border"
-                            } px-2.5 py-0.5`}
-                            onClick={() => {
-                              setSelectedYear(yr);
-                              const invs = DataStorage.getInvoices(selectedFlatForMatrix.id, yr);
-                              const unique12 = Array.from(new Map(invs.map((i) => [i.month, i])).values())
-                                .sort((a, b) => a.month - b.month)
-                                .slice(0, 12);
-                              setFlatYearInvoices(unique12);
-                              setSelectedMonthIds([]);
-                            }}
-                          >
-                            {yr}
-                          </button>
-                        ))}
+                        {AVAILABLE_YEARS.map((yr) => {
+                          const tag = yr < 2026 ? "History" : yr === 2026 ? "Active" : "Upcoming";
+                          return (
+                            <button
+                              key={yr}
+                              type="button"
+                              className={`btn btn-sm ${
+                                selectedYear === yr
+                                  ? "btn-primary text-white fw-bold shadow-sm"
+                                  : "btn-light text-secondary border"
+                              } px-2.5 py-0.5`}
+                              onClick={() => {
+                                setSelectedYear(yr);
+                                const invs = DataStorage.getInvoices(selectedFlatForMatrix.id, yr);
+                                const unique12 = Array.from(new Map(invs.map((i) => [i.month, i])).values())
+                                  .sort((a, b) => a.month - b.month)
+                                  .slice(0, 12);
+                                setFlatYearInvoices(unique12);
+                                setSelectedMonthIds([]);
+                              }}
+                            >
+                              {yr} ({tag})
+                            </button>
+                          );
+                        })}
                       </div>
                       {isLeapYear(selectedYear) ? (
                         <span className="badge bg-info text-dark border fw-bold">
@@ -1286,6 +1361,11 @@ export default function MaintenancePage() {
                       <strong className="text-dark">₹{annualRateTotal.toLocaleString()}</strong> | Paid:{" "}
                       <strong className="text-success">₹{totalPaidYear.toLocaleString()}</strong> | Pending Due:{" "}
                       <strong className={totalDueYear > 0 ? "text-danger" : "text-muted"}>₹{totalDueYear.toLocaleString()}</strong>
+                      {selectedYear > 2026 && totalPaidYear === 0 && (
+                        <span className="ms-2 badge bg-secondary-subtle text-secondary border">
+                          Upcoming Cycle (Unbilled)
+                        </span>
+                      )}
                       {Number(selectedFlatForMatrix.advance_balance || 0) > 0 && (
                         <span className="ms-2 badge bg-purple-subtle text-primary border">
                           Advance Pool: ₹{Number(selectedFlatForMatrix.advance_balance).toLocaleString()}
