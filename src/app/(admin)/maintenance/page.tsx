@@ -54,9 +54,9 @@ export default function MaintenancePage() {
   const [floorFilter, setFloorFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
-  const [selectedYear, setSelectedYear] = useState<number>(() => {
-    return typeof window !== "undefined" ? new Date().getFullYear() : 2026;
-  });
+  const AVAILABLE_YEARS = [2025, 2026, 2027];
+  const [selectedYear, setSelectedYear] = useState<number>(2026);
+  const [paymentYearFilter, setPaymentYearFilter] = useState<string>("ALL");
 
   // Collect Payment Modal
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -233,12 +233,11 @@ export default function MaintenancePage() {
     }
   };
 
-  // Open Annual Maintenance Collection Matrix (auto-identifies active or advanced year)
-  const handleOpenMatrix = (flat: Flat) => {
+  // Open Annual Maintenance Collection Matrix (opens requested or selected year)
+  const handleOpenMatrix = (flat: Flat, yearToOpen: number = selectedYear) => {
     setSelectedFlatForMatrix(flat);
-    const autoYear = DataStorage.getFlatActiveMaintenanceYear(flat.id);
-    setSelectedYear(autoYear);
-    const flatInvs = DataStorage.getInvoices(flat.id, autoYear);
+    setSelectedYear(yearToOpen);
+    const flatInvs = DataStorage.getInvoices(flat.id, yearToOpen);
     const unique12 = Array.from(new Map(flatInvs.map((i) => [i.month, i])).values())
       .sort((a, b) => a.month - b.month)
       .slice(0, 12);
@@ -466,7 +465,7 @@ export default function MaintenancePage() {
     }
   };
 
-  // Filtered flats
+  // Filtered flats for selectedYear
   const filteredFlats = flats.filter((flat) => {
     const matchesSearch =
       flat.flat_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -476,19 +475,38 @@ export default function MaintenancePage() {
     const matchesType =
       typeFilter === "ALL" || (flat.current_resident && flat.current_resident.resident_type === typeFilter);
 
+    const flatYearInvs = invoices.filter((i) => i.flat_id === flat.id && i.year === selectedYear);
+    const flatYearDue = flatYearInvs.reduce((sum, i) => sum + Number(i.due_amount || 0), 0);
+
     let matchesStatus = true;
-    if (statusFilter === "PAID") matchesStatus = (flat.outstanding_dues || 0) === 0;
-    if (statusFilter === "UNPAID") matchesStatus = (flat.outstanding_dues || 0) > 0;
+    if (statusFilter === "PAID") matchesStatus = flatYearDue === 0;
+    if (statusFilter === "UNPAID") matchesStatus = flatYearDue > 0;
 
     return matchesSearch && matchesFloor && matchesType && matchesStatus;
   });
 
-  // Calculate Overview Stats
+  // Calculate Overview Stats for selectedYear
+  const yearInvoices = invoices.filter((i) => i.year === selectedYear);
+  const yearPayments = payments.filter((p) => {
+    const pYear = p.payment_date ? new Date(p.payment_date).getFullYear() : 2026;
+    return pYear === selectedYear;
+  });
+
   const totalFlatsCount = flats.length;
-  const paidFlatsCount = flats.filter((f) => (f.outstanding_dues || 0) === 0).length;
-  const unpaidFlatsCount = flats.filter((f) => (f.outstanding_dues || 0) > 0).length;
-  const totalPendingSum = flats.reduce((sum, f) => sum + (f.outstanding_dues || 0), 0);
-  const totalCollectedSum = payments.reduce((sum, p) => sum + Number(p.total_amount_received || 0), 0);
+  const paidFlatsCount = flats.filter((f) => {
+    const dues = yearInvoices
+      .filter((i) => i.flat_id === f.id)
+      .reduce((sum, i) => sum + Number(i.due_amount || 0), 0);
+    return dues === 0;
+  }).length;
+  const unpaidFlatsCount = flats.filter((f) => {
+    const dues = yearInvoices
+      .filter((i) => i.flat_id === f.id)
+      .reduce((sum, i) => sum + Number(i.due_amount || 0), 0);
+    return dues > 0;
+  }).length;
+  const totalPendingSum = yearInvoices.reduce((sum, i) => sum + Number(i.due_amount || 0), 0);
+  const totalCollectedSum = yearPayments.reduce((sum, p) => sum + Number(p.total_amount_received || 0), 0);
   const advancePoolSum = flats.reduce((sum, f) => sum + Number(f.advance_balance || 0), 0);
 
   return (
@@ -498,17 +516,31 @@ export default function MaintenancePage() {
         subtitle="Manage flat-wise maintenance collections, 12-month calendar tracking, multiple-month payments, and receipts"
         breadcrumbs={[{ label: "Maintenance" }]}
         actions={
-          <div className="d-flex align-items-center gap-2">
-            <div className="badge bg-white text-dark border px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm">
-              <Calendar size={14} className="text-primary" />
-              <span>Active Cycle: {selectedYear}</span>
-              {isLeapYear(selectedYear) ? (
-                <span className="badge bg-primary-subtle text-primary border ms-1 py-0 px-1.5 small">
+          <div className="d-flex align-items-center gap-2 flex-wrap">
+            <div className="bg-white border rounded-3 p-1 d-inline-flex align-items-center shadow-sm">
+              <span className="small text-secondary px-2 fw-semibold d-inline-flex align-items-center gap-1">
+                <Calendar size={14} className="text-primary" />
+                Cycle:
+              </span>
+              <div className="btn-group btn-group-sm" role="group">
+                {AVAILABLE_YEARS.map((yr) => (
+                  <button
+                    key={yr}
+                    type="button"
+                    className={`btn btn-sm ${
+                      selectedYear === yr
+                        ? "btn-primary-custom fw-bold shadow-sm"
+                        : "btn-light text-secondary"
+                    } px-3 py-1`}
+                    onClick={() => setSelectedYear(yr)}
+                  >
+                    {yr}
+                  </button>
+                ))}
+              </div>
+              {isLeapYear(selectedYear) && (
+                <span className="badge bg-primary-subtle text-primary border ms-2 me-1 py-1 px-2 small">
                   Leap Year (29 Feb)
-                </span>
-              ) : (
-                <span className="badge bg-light text-muted border ms-1 py-0 px-1.5 small">
-                  28 Feb
                 </span>
               )}
             </div>
@@ -520,7 +552,7 @@ export default function MaintenancePage() {
       <div className="row g-3 mb-4 maintenance-kpi-grid">
         <div className="col-6 col-lg-3">
           <div className="stat-card border-start border-4 border-success">
-            <div className="stat-title">Total Collected</div>
+            <div className="stat-title">Total Collected ({selectedYear})</div>
             <div className="stat-value text-success">₹{totalCollectedSum.toLocaleString()}</div>
             <div className="small text-secondary mt-1">
               <span className="fw-bold text-dark">{paidFlatsCount}</span> of {totalFlatsCount} Flats Paid
@@ -530,7 +562,7 @@ export default function MaintenancePage() {
 
         <div className="col-6 col-lg-3">
           <div className="stat-card border-start border-4 border-danger">
-            <div className="stat-title">Total Pending Dues</div>
+            <div className="stat-title">Total Pending Dues ({selectedYear})</div>
             <div className="stat-value text-danger">₹{totalPendingSum.toLocaleString()}</div>
             <div className="small text-secondary mt-1">
               <span className="fw-bold text-danger">{unpaidFlatsCount}</span> Flats with Dues
@@ -624,6 +656,19 @@ export default function MaintenancePage() {
                   <option value="PAID">All Clear (Paid)</option>
                   <option value="UNPAID">Pending Dues</option>
                 </select>
+
+                <select
+                  className="form-select form-select-sm maintenance-filter-select fw-semibold border-primary text-primary bg-primary-subtle"
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  title="Filter by Year Cycle"
+                >
+                  {AVAILABLE_YEARS.map((yr) => (
+                    <option key={yr} value={yr}>
+                      Year {yr} {yr === 2026 && isLeapYear(yr) ? "(Leap Year)" : ""}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="small text-secondary">
@@ -657,11 +702,19 @@ export default function MaintenancePage() {
                     </tr>
                   ) : (
                     filteredFlats.map((flat) => {
+                      const flatYearInvs = invoices.filter(
+                        (i) => i.flat_id === flat.id && i.year === selectedYear
+                      );
+                      const flatYearDue = flatYearInvs.reduce(
+                        (sum, i) => sum + Number(i.due_amount || 0),
+                        0
+                      );
+                      const isClear = flatYearDue === 0;
+
                       const currentMonthNum = new Date().getMonth() + 1;
                       const currentMonthInv = invoices.find(
                         (i) => i.flat_id === flat.id && i.month === currentMonthNum && i.year === selectedYear
                       );
-                      const isClear = (flat.outstanding_dues || 0) === 0;
 
                       return (
                         <tr key={flat.id}>
@@ -708,35 +761,42 @@ export default function MaintenancePage() {
                           </td>
                           <td>
                             {!isClear ? (
-                              <span className="fw-bold text-danger">₹{flat.outstanding_dues?.toLocaleString()}</span>
+                              <span className="fw-bold text-danger">₹{flatYearDue.toLocaleString()}</span>
                             ) : (
                               <span className="text-success small fw-semibold">₹0</span>
                             )}
                           </td>
                           <td>
-                            <StatusBadge
-                              status={currentMonthInv ? currentMonthInv.status : "NO_DUES"}
-                              label={
-                                !currentMonthInv || currentMonthInv.status === "NO_DUES"
-                                  ? "NO DUES"
-                                  : currentMonthInv.status === "ADVANCE_COVERED"
-                                    ? "ADVANCE"
-                                    : currentMonthInv.status === "UNPAID"
-                                      ? "UNPAID"
-                                      : currentMonthInv.status === "PARTIAL"
-                                        ? "PARTIAL"
-                                        : "PAID"
-                              }
-                            />
+                            {selectedYear === 2026 ? (
+                              <StatusBadge
+                                status={currentMonthInv ? currentMonthInv.status : "NO_DUES"}
+                                label={
+                                  !currentMonthInv || currentMonthInv.status === "NO_DUES"
+                                    ? "NO DUES"
+                                    : currentMonthInv.status === "ADVANCE_COVERED"
+                                      ? "ADVANCE"
+                                      : currentMonthInv.status === "UNPAID"
+                                        ? "UNPAID"
+                                        : currentMonthInv.status === "PARTIAL"
+                                          ? "PARTIAL"
+                                          : "PAID"
+                                }
+                              />
+                            ) : (
+                              <StatusBadge
+                                status={isClear ? "PAID" : "UNPAID"}
+                                label={isClear ? `${selectedYear} ALL PAID` : `${selectedYear} PENDING (₹${flatYearDue})`}
+                              />
+                            )}
                           </td>
                           <td className="text-end">
                             <button
                               className="btn btn-sm btn-primary-custom py-1.5 px-3 d-inline-flex align-items-center gap-1.5 fw-semibold"
-                              onClick={() => handleOpenMatrix(flat)}
-                              title="Annual Maintenance Collection & 12-Month Ledger"
+                              onClick={() => handleOpenMatrix(flat, selectedYear)}
+                              title={`Annual Maintenance Collection & 12-Month Ledger for ${selectedYear}`}
                             >
                               <Calendar size={14} />
-                              <span>Annual Maintenance Collection</span>
+                              <span>Annual Collection ({selectedYear})</span>
                             </button>
                           </td>
                         </tr>
@@ -748,108 +808,161 @@ export default function MaintenancePage() {
             </div>
           </div>
         </>
-      ) : (
-        /* Payment Records Tab */
-        <div className="card-premium maintenance-table-card">
-          <div className="table-responsive maintenance-table-scroll">
-            <table className="table table-premium align-middle mb-0 maintenance-data-table">
-              <thead>
-                <tr>
-                  <th>Receipt #</th>
-                  <th>Flat #</th>
-                  <th>Date</th>
-                  <th>Payment Mode &amp; Ref</th>
-                  <th>Amount Received</th>
-                  <th>Photo Attachment</th>
-                  <th className="text-end">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payments.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="text-center py-5 text-secondary">
-                      No maintenance payments recorded yet. Click &quot;Collect&quot; next to any flat to record a payment.
-                    </td>
-                  </tr>
-                ) : (
-                  payments.map((p) => {
-                    const flat = flats.find((f) => f.id === p.flat_id);
-                    return (
-                      <tr key={p.id}>
-                        <td>
-                          <span className="font-monospace fw-bold text-primary">{p.receipt_number}</span>
-                        </td>
-                        <td>
-                          <span className="fw-semibold text-dark">Flat {flat?.flat_number || "—"}</span>
-                          <div className="small text-muted">{flat?.current_resident?.full_name || "Owner"}</div>
-                        </td>
-                        <td className="small text-secondary">{formatDate(p.payment_date)}</td>
-                        <td>
-                          <span className="badge bg-light text-dark border me-1">{p.payment_method}</span>
-                          {p.transaction_ref && (
-                            <span className="small text-muted font-monospace d-block">{p.transaction_ref}</span>
-                          )}
-                        </td>
-                        <td>
-                          <span className="fw-bold text-success fs-6">
-                            ₹{Number(p.total_amount_received).toLocaleString()}
-                          </span>
-                        </td>
-                        <td>
-                          {p.attachment_url ? (
-                            <div className="d-flex align-items-center gap-2 flex-wrap">
-                              <img
-                                src={p.attachment_url}
-                                alt="Proof"
-                                className="rounded border cursor-pointer"
-                                style={{ width: "36px", height: "36px", objectFit: "cover" }}
-                                onClick={() =>
-                                  setPreviewImage({
-                                    url: p.attachment_url!,
-                                    title: `Receipt ${p.receipt_number} — Flat ${flat?.flat_number}`,
-                                  })
-                                }
-                              />
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-secondary p-1 small"
-                                onClick={() =>
-                                  setPreviewImage({
-                                    url: p.attachment_url!,
-                                    title: `Receipt ${p.receipt_number} — Flat ${flat?.flat_number}`,
-                                  })
-                                }
-                                title="View Photo Attachment"
-                              >
-                                <Eye size={14} />
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-muted small">No attachment</span>
-                          )}
-                        </td>
-                        <td className="text-end">
-                          <button
-                            className="btn btn-sm btn-outline-primary py-1 px-2 d-inline-flex align-items-center gap-1"
-                            onClick={() => {
-                              setActiveReceipt(p);
-                              setReceiptFlat(flat || null);
-                              setShowReceiptModal(true);
-                            }}
-                          >
-                            <FileText size={14} />
-                            <span>Receipt</span>
-                          </button>
+      ) : (() => {
+        const filteredPayments = payments.filter((p) => {
+          if (paymentYearFilter === "ALL") return true;
+          const pYear = p.payment_date ? new Date(p.payment_date).getFullYear().toString() : "2026";
+          return pYear === paymentYearFilter;
+        });
+
+        return (
+          <>
+            {/* Payment Filter Bar */}
+            <div className="card-premium mb-4 maintenance-filter-card">
+              <div className="p-3 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3">
+                <div className="d-flex align-items-center gap-2 flex-wrap">
+                  <span className="small text-secondary fw-bold">Filter By Year:</span>
+                  <div className="btn-group btn-group-sm" role="group">
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${
+                        paymentYearFilter === "ALL"
+                          ? "btn-primary-custom fw-bold shadow-sm"
+                          : "btn-light text-secondary border"
+                      } px-3 py-1`}
+                      onClick={() => setPaymentYearFilter("ALL")}
+                    >
+                      All Years ({payments.length})
+                    </button>
+                    {AVAILABLE_YEARS.map((yr) => {
+                      const count = payments.filter(
+                        (p) => p.payment_date && new Date(p.payment_date).getFullYear() === yr
+                      ).length;
+                      return (
+                        <button
+                          key={yr}
+                          type="button"
+                          className={`btn btn-sm ${
+                            paymentYearFilter === String(yr)
+                              ? "btn-primary-custom fw-bold shadow-sm"
+                              : "btn-light text-secondary border"
+                          } px-3 py-1`}
+                          onClick={() => setPaymentYearFilter(String(yr))}
+                        >
+                          {yr} ({count})
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="small text-secondary">
+                  Showing <strong className="text-dark">{filteredPayments.length}</strong> Receipts
+                </div>
+              </div>
+            </div>
+
+            <div className="card-premium maintenance-table-card">
+              <div className="table-responsive maintenance-table-scroll">
+                <table className="table table-premium align-middle mb-0 maintenance-data-table">
+                  <thead>
+                    <tr>
+                      <th>Receipt #</th>
+                      <th>Flat #</th>
+                      <th>Date</th>
+                      <th>Payment Mode &amp; Ref</th>
+                      <th>Amount Received</th>
+                      <th>Photo Attachment</th>
+                      <th className="text-end">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredPayments.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="text-center py-5 text-secondary">
+                          No maintenance payments recorded for the selected filter.
                         </td>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+                    ) : (
+                      filteredPayments.map((p) => {
+                        const flat = flats.find((f) => f.id === p.flat_id);
+                        return (
+                          <tr key={p.id}>
+                            <td>
+                              <span className="font-monospace fw-bold text-primary">{p.receipt_number}</span>
+                            </td>
+                            <td>
+                              <span className="fw-semibold text-dark">Flat {flat?.flat_number || "—"}</span>
+                              <div className="small text-muted">{flat?.current_resident?.full_name || "Owner"}</div>
+                            </td>
+                            <td className="small text-secondary">{formatDate(p.payment_date)}</td>
+                            <td>
+                              <span className="badge bg-light text-dark border me-1">{p.payment_method}</span>
+                              {p.transaction_ref && (
+                                <span className="small text-muted font-monospace d-block">{p.transaction_ref}</span>
+                              )}
+                            </td>
+                            <td>
+                              <span className="fw-bold text-success fs-6">
+                                ₹{Number(p.total_amount_received).toLocaleString()}
+                              </span>
+                            </td>
+                            <td>
+                              {p.attachment_url ? (
+                                <div className="d-flex align-items-center gap-2 flex-wrap">
+                                  <img
+                                    src={p.attachment_url}
+                                    alt="Proof"
+                                    className="rounded border cursor-pointer"
+                                    style={{ width: "36px", height: "36px", objectFit: "cover" }}
+                                    onClick={() =>
+                                      setPreviewImage({
+                                        url: p.attachment_url!,
+                                        title: `Receipt ${p.receipt_number} — Flat ${flat?.flat_number}`,
+                                      })
+                                    }
+                                  />
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline-secondary p-1 small"
+                                    onClick={() =>
+                                      setPreviewImage({
+                                        url: p.attachment_url!,
+                                        title: `Receipt ${p.receipt_number} — Flat ${flat?.flat_number}`,
+                                      })
+                                    }
+                                    title="View Photo Attachment"
+                                  >
+                                    <Eye size={14} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-muted small">No attachment</span>
+                              )}
+                            </td>
+                            <td className="text-end">
+                              <button
+                                className="btn btn-sm btn-outline-primary py-1 px-2 d-inline-flex align-items-center gap-1"
+                                onClick={() => {
+                                  setActiveReceipt(p);
+                                  setReceiptFlat(flat || null);
+                                  setShowReceiptModal(true);
+                                }}
+                              >
+                                <FileText size={14} />
+                                <span>Receipt</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       {/* Collect Payment Professional Modal */}
       {showPaymentModal && selectedFlatForPayment && (
@@ -1115,6 +1228,30 @@ export default function MaintenancePage() {
                       <h5 className="modal-title fw-bold text-dark mb-0">
                         Annual Maintenance Collection &mdash; Flat {selectedFlatForMatrix.flat_number} ({selectedYear})
                       </h5>
+                      <div className="btn-group btn-group-sm shadow-sm" role="group">
+                        {AVAILABLE_YEARS.map((yr) => (
+                          <button
+                            key={yr}
+                            type="button"
+                            className={`btn btn-sm ${
+                              selectedYear === yr
+                                ? "btn-primary text-white fw-bold shadow-sm"
+                                : "btn-light text-secondary border"
+                            } px-2.5 py-0.5`}
+                            onClick={() => {
+                              setSelectedYear(yr);
+                              const invs = DataStorage.getInvoices(selectedFlatForMatrix.id, yr);
+                              const unique12 = Array.from(new Map(invs.map((i) => [i.month, i])).values())
+                                .sort((a, b) => a.month - b.month)
+                                .slice(0, 12);
+                              setFlatYearInvoices(unique12);
+                              setSelectedMonthIds([]);
+                            }}
+                          >
+                            {yr}
+                          </button>
+                        ))}
+                      </div>
                       {isLeapYear(selectedYear) ? (
                         <span className="badge bg-info text-dark border fw-bold">
                           Leap Year ({selectedYear}) &bull; Feb 29 Days
