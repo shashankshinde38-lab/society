@@ -6,7 +6,7 @@ import { DataStorage } from "@/services/dataStorage";
 import { Society, MaintenanceSettings, MaintenanceRateHistory } from "@/types/database.types";
 import { AmountInput } from "@/components/common/AmountInput/AmountInput";
 import { sanitizeMobileInput, validateMobile, validateEmail } from "@/utils/validation";
-import { Building2, Settings2, History, Save, AlertCircle, TrendingUp, Landmark, QrCode, ShieldCheck, Users2, Trash2 } from "lucide-react";
+import { Building2, Settings2, History, Save, AlertCircle, TrendingUp, Landmark, QrCode, ShieldCheck, Users2, Trash2, Database, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AppSetupPage() {
@@ -54,6 +54,14 @@ export default function AppSetupPage() {
     DataStorage.truncateAllOperationalData();
     setShowTruncateConfirm(false);
     toast.success("All operational data (floors, flats, residents, invoices, expenses, payments) has been truncated successfully!");
+    setTimeout(() => {
+      window.location.reload();
+    }, 800);
+  };
+
+  const handleReseedAllData = () => {
+    DataStorage.reseedHistoricalData();
+    toast.success("Database synchronized! Staged all 15 months of spreadsheet data (Sep 2025 - Nov 2026).");
     setTimeout(() => {
       window.location.reload();
     }, 800);
@@ -600,6 +608,29 @@ export default function AppSetupPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Historical Data Seeder: Re-apply 15-Month Records */}
+      <div className="card-premium border border-primary-subtle mb-4">
+        <div className="p-4 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3">
+          <div>
+            <h6 className="fw-bold text-primary mb-1 d-flex align-items-center gap-2">
+              <Database size={18} />
+              <span>Official Historical Spreadsheet Seeder (Sep 2025 – Nov 2026)</span>
+            </h6>
+            <p className="small text-secondary mb-0">
+              Synchronize live database with all 15 monthly record sheets: 20 flats, 54 society expenses (₹3,22,843), 231 payment receipts (₹3,40,600), and 480 calendar invoices.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-outline-primary d-inline-flex align-items-center gap-2 flex-shrink-0"
+            onClick={handleReseedAllData}
+          >
+            <RotateCcw size={16} />
+            <span>Reseed / Sync Database</span>
+          </button>
         </div>
       </div>
 

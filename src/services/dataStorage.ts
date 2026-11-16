@@ -38,7 +38,7 @@ import {
 } from "./mockInitialData";
 import { getValidDueDate } from "@/utils/dateFormatter";
 
-const STORAGE_KEY_PREFIX = "parijat_erp_v7_";
+const STORAGE_KEY_PREFIX = "parijat_erp_v8_";
 
 // One-time auto-clean of any legacy cache keys to ensure completely fresh truncated live state
 if (typeof window !== "undefined") {
@@ -1382,5 +1382,23 @@ export const DataStorage = {
     setStoredItem("payments", []);
     setStoredItem("wallet_transactions", []);
     setStoredItem("email_logs", []);
+  },
+
+  /**
+   * Reseeds all operational data from the historical spreadsheet seeder.
+   * Repopulates: floors, flats, residents, invoices, expenses, payments, wallet transactions from initial data.
+   */
+  reseedHistoricalData(): void {
+    if (typeof window === "undefined") return;
+    setStoredItem("floors", initialFloors);
+    setStoredItem("flats", initialFlats);
+    setStoredItem("residents", initialResidents);
+    setStoredItem("flat_history", []);
+    setStoredItem("rate_history", []);
+    setStoredItem("invoices", initialInvoices);
+    setStoredItem("expenses", initialExpenses);
+    setStoredItem("payments", initialPayments);
+    setStoredItem("wallet_transactions", initialWalletTransactions);
+    setStoredItem("categories", initialCategories);
   },
 };
