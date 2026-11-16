@@ -58,6 +58,7 @@ export const initialSettings: MaintenanceSettings = {
   late_fee_enabled: false,
   late_fee_amount: 0.0,
   reminder_days: [5, 10, 15, 20, 25, 30],
+  email_notifications_enabled: true,
   created_at: "2026-04-01T00:00:00Z",
   updated_at: "2026-04-01T00:00:00Z",
 };

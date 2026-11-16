@@ -37,7 +37,21 @@ export async function POST(req: NextRequest) {
       society,
       expenseData,
       announcementData,
+      emailNotificationsEnabled,
     } = body;
+
+    // Check if email notifications are master-toggled off
+    if (emailNotificationsEnabled === false) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Email notifications are currently disabled by Admin. No emails were sent.",
+          code: "EMAIL_NOTIFICATIONS_DISABLED",
+          skipped: true,
+        },
+        { status: 200 }
+      );
+    }
 
     if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
       return NextResponse.json(

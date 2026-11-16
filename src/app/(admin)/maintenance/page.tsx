@@ -29,6 +29,7 @@ import {
   Mail,
   Edit2,
   Settings2,
+  BellOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
@@ -88,6 +89,29 @@ export default function MaintenancePage() {
   const [showSetRateModal, setShowSetRateModal] = useState(false);
   const [targetFlatForRate, setTargetFlatForRate] = useState<Flat | null>(null);
   const [rateInputValue, setRateInputValue] = useState<number | "">(1500);
+
+  // Email Notifications Global Setting
+  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState<boolean>(true);
+
+  useEffect(() => {
+    setEmailNotificationsEnabled(DataStorage.isEmailNotificationsEnabled());
+    const handleToggleEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ enabled: boolean }>;
+      setEmailNotificationsEnabled(customEvent.detail?.enabled ?? DataStorage.isEmailNotificationsEnabled());
+    };
+    window.addEventListener("email_notifications_toggled", handleToggleEvent);
+    return () => window.removeEventListener("email_notifications_toggled", handleToggleEvent);
+  }, []);
+
+  const handleToggleEmailNotifications = (enabled: boolean) => {
+    DataStorage.setEmailNotificationsEnabled(enabled);
+    setEmailNotificationsEnabled(enabled);
+    if (enabled) {
+      toast.success("Email notifications enabled! Outgoing emails will be sent.");
+    } else {
+      toast.warning("Email notifications paused! No outgoing emails will be sent.");
+    }
+  };
 
   const loadData = () => {
     setFlats(DataStorage.getFlats());
@@ -224,9 +248,13 @@ export default function MaintenancePage() {
       setReceiptAllocatedMonths(result.allocatedMonths);
       setShowReceiptModal(true);
 
-      // Automatically email invoice receipt to resident if email is registered
+      // Automatically email invoice receipt to resident if email is registered AND email notifications are enabled
       if (selectedFlatForPayment.current_resident?.email) {
-        handleSendReceiptEmail(result.payment, selectedFlatForPayment, result.allocatedMonths);
+        if (DataStorage.isEmailNotificationsEnabled()) {
+          handleSendReceiptEmail(result.payment, selectedFlatForPayment, result.allocatedMonths);
+        } else {
+          toast.info("Payment saved! Email notifications are paused (OFF), so no receipt email was dispatched.");
+        }
       }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Payment recording failed");
@@ -404,6 +432,11 @@ export default function MaintenancePage() {
       return;
     }
 
+    if (!DataStorage.isEmailNotificationsEnabled()) {
+      toast.warning("Email notifications are currently toggled OFF. Turn ON notifications in the header to dispatch emails.");
+      return;
+    }
+
     setSendingReceiptEmail(true);
     try {
       const doc = createReceiptPDFDocument(receipt, flat, allocatedMonths);
@@ -416,6 +449,7 @@ export default function MaintenancePage() {
         body: JSON.stringify({
           type: "PAYMENT_RECEIPT",
           society: currentSoc,
+          emailNotificationsEnabled: DataStorage.isEmailNotificationsEnabled(),
           recipients: [
             {
               name: flat.current_resident.full_name,
@@ -534,6 +568,33 @@ export default function MaintenancePage() {
         breadcrumbs={[{ label: "Maintenance" }]}
         actions={
           <div className="d-flex align-items-center gap-2 flex-wrap">
+            {/* Master Email Notifications Toggle */}
+            <div className="bg-white border rounded-3 p-1 px-2.5 d-inline-flex align-items-center gap-2 shadow-sm">
+              <div className="form-check form-switch mb-0 d-flex align-items-center gap-1.5">
+                <input
+                  className="form-check-input cursor-pointer"
+                  type="checkbox"
+                  role="switch"
+                  id="maintEmailToggle"
+                  checked={emailNotificationsEnabled}
+                  onChange={(e) => handleToggleEmailNotifications(e.target.checked)}
+                  style={{ width: "2.3em", height: "1.2em", cursor: "pointer" }}
+                  title="Toggle all email notifications ON or OFF"
+                />
+                <label className="form-check-label fw-bold text-dark small cursor-pointer mb-0 d-flex align-items-center gap-1.5" htmlFor="maintEmailToggle">
+                  {emailNotificationsEnabled ? (
+                    <Mail size={14} className="text-success" />
+                  ) : (
+                    <BellOff size={14} className="text-danger" />
+                  )}
+                  <span>Email:</span>
+                  <span className={`badge ${emailNotificationsEnabled ? "bg-success text-white" : "bg-danger text-white"} py-0.5 px-2`} style={{ fontSize: "0.72rem" }}>
+                    {emailNotificationsEnabled ? "ON" : "OFF"}
+                  </span>
+                </label>
+              </div>
+            </div>
+
             <div className="bg-white border rounded-3 p-1 d-inline-flex align-items-center shadow-sm">
               <span className="small text-secondary px-2 fw-semibold d-inline-flex align-items-center gap-1">
                 <Calendar size={14} className="text-primary" />
@@ -1222,12 +1283,21 @@ export default function MaintenancePage() {
                     {/* Automated Email Invoice Notice */}
                     {selectedFlatForPayment.current_resident?.email ? (
                       <div className="col-12">
-                        <div className="p-3 bg-success-subtle border border-success-subtle rounded-3 d-flex align-items-center gap-2">
-                          <Check size={16} className="text-success flex-shrink-0" />
-                          <div className="small text-success-emphasis">
-                            <strong>Automated Email Invoice Dispatch:</strong> Upon saving, an official payment receipt email with the generated invoice PDF attached will be dispatched to <strong>{selectedFlatForPayment.current_resident.email}</strong>.
+                        {emailNotificationsEnabled ? (
+                          <div className="p-3 bg-success-subtle border border-success-subtle rounded-3 d-flex align-items-center gap-2">
+                            <Check size={16} className="text-success flex-shrink-0" />
+                            <div className="small text-success-emphasis">
+                              <strong>Automated Email Invoice Dispatch:</strong> Upon saving, an official payment receipt email with the generated invoice PDF attached will be dispatched to <strong>{selectedFlatForPayment.current_resident.email}</strong>.
+                            </div>
                           </div>
-                        </div>
+                        ) : (
+                          <div className="p-3 bg-warning-subtle border border-warning-subtle rounded-3 d-flex align-items-center gap-2">
+                            <BellOff size={16} className="text-warning flex-shrink-0" />
+                            <div className="small text-warning-emphasis">
+                              <strong>Email Notifications Paused (OFF):</strong> Master email toggle is OFF. Payment will be recorded, but no receipt email will be dispatched. You can view or download the PDF receipt directly after saving.
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="col-12">
@@ -1692,9 +1762,10 @@ export default function MaintenancePage() {
                   {receiptFlat.current_resident?.email && (
                     <button
                       type="button"
-                      className="btn btn-outline-primary d-inline-flex align-items-center gap-1.5"
+                      className={`btn ${emailNotificationsEnabled ? "btn-outline-primary" : "btn-outline-secondary"} d-inline-flex align-items-center gap-1.5`}
                       onClick={() => handleSendReceiptEmail(activeReceipt, receiptFlat, receiptAllocatedMonths)}
-                      disabled={sendingReceiptEmail}
+                      disabled={sendingReceiptEmail || !emailNotificationsEnabled}
+                      title={emailNotificationsEnabled ? "Email invoice receipt to resident" : "Email notifications are currently toggled OFF"}
                     >
                       {sendingReceiptEmail ? (
                         <>
@@ -1703,8 +1774,8 @@ export default function MaintenancePage() {
                         </>
                       ) : (
                         <>
-                          <Mail size={15} />
-                          <span>Email Invoice</span>
+                          {emailNotificationsEnabled ? <Mail size={15} /> : <BellOff size={15} className="text-danger" />}
+                          <span>{emailNotificationsEnabled ? "Email Invoice" : "Email Paused (OFF)"}</span>
                         </>
                       )}
                     </button>

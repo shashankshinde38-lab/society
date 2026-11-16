@@ -92,7 +92,7 @@ export default function ExpensesPage() {
       toast.success(`Expense ₹${numAmount.toLocaleString()} recorded and debited from Society Wallet`);
 
       // Phase 3: Notify registered society residents if enabled
-      if (notifyResidents) {
+      if (notifyResidents && DataStorage.isEmailNotificationsEnabled()) {
         const residents = DataStorage.getResidents().filter((r) => r.is_active && r.email);
         const cat = categories.find((c) => c.id === categoryId);
         const society = DataStorage.getSociety();
@@ -111,6 +111,7 @@ export default function ExpensesPage() {
               type: "EXPENSE_ALERT",
               recipients: recipientPayload,
               society,
+              emailNotificationsEnabled: DataStorage.isEmailNotificationsEnabled(),
               expenseData: {
                 title: title.trim(),
                 category: cat?.name || "General Maintenance",

@@ -93,6 +93,7 @@ export interface MaintenanceSettings {
   late_fee_enabled: boolean;
   late_fee_amount: number;
   reminder_days: number[];
+  email_notifications_enabled?: boolean;
   created_at: string;
   updated_at: string;
 }

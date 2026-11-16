@@ -125,13 +125,26 @@ export const DataStorage = {
     const stored = getStoredItem<MaintenanceSettings>("settings", initialSettings);
     const ownerAmount = stored.owner_monthly_amount ?? stored.monthly_amount ?? 1100;
     const tenantAmount = stored.tenant_monthly_amount ?? 1500;
+    const emailEnabled = stored.email_notifications_enabled ?? true;
     return {
       ...initialSettings,
       ...stored,
       owner_monthly_amount: ownerAmount,
       tenant_monthly_amount: tenantAmount,
       monthly_amount: ownerAmount,
+      email_notifications_enabled: emailEnabled,
     };
+  },
+  isEmailNotificationsEnabled(): boolean {
+    const settings = this.getSettings();
+    return settings.email_notifications_enabled !== false;
+  },
+  setEmailNotificationsEnabled(enabled: boolean): boolean {
+    this.updateSettings({ email_notifications_enabled: enabled });
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("email_notifications_toggled", { detail: { enabled } }));
+    }
+    return enabled;
   },
   getFlatMaintenanceRate(flatOrId: Flat | string): number {
     let flat: Flat | undefined;

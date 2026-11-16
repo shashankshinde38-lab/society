@@ -30,6 +30,7 @@ import {
   Users2,
   Trash2,
   Sparkles,
+  BellOff,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -68,6 +69,27 @@ export default function MailerPage() {
   // Loading & Execution States
   const [isBatchSending, setIsBatchSending] = useState(false);
   const [sendingCron, setSendingCron] = useState(false);
+  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState<boolean>(true);
+
+  useEffect(() => {
+    setEmailNotificationsEnabled(DataStorage.isEmailNotificationsEnabled());
+    const handleToggleEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ enabled: boolean }>;
+      setEmailNotificationsEnabled(customEvent.detail?.enabled ?? DataStorage.isEmailNotificationsEnabled());
+    };
+    window.addEventListener("email_notifications_toggled", handleToggleEvent);
+    return () => window.removeEventListener("email_notifications_toggled", handleToggleEvent);
+  }, []);
+
+  const handleToggleEmailNotifications = (enabled: boolean) => {
+    DataStorage.setEmailNotificationsEnabled(enabled);
+    setEmailNotificationsEnabled(enabled);
+    if (enabled) {
+      toast.success("Email notifications enabled! Outgoing emails will be sent.");
+    } else {
+      toast.warning("Email notifications paused! No outgoing emails will be sent.");
+    }
+  };
   const [smtpStatus] = useState<{
     configured: boolean;
     host: string;
@@ -194,6 +216,10 @@ export default function MailerPage() {
       return { success: false, error: "No email address registered for this resident." };
     }
 
+    if (!DataStorage.isEmailNotificationsEnabled()) {
+      return { success: false, error: "Email notifications are disabled by admin in settings." };
+    }
+
     const currentSoc = DataStorage.getSociety();
     const invoices = DataStorage.getInvoices().filter(
       (inv) => inv.flat_id === user.flatId && (inv.status === "UNPAID" || inv.status === "PARTIAL") && Number(inv.due_amount) > 0
@@ -216,6 +242,7 @@ export default function MailerPage() {
       body: JSON.stringify({
         type: emailType,
         society: currentSoc,
+        emailNotificationsEnabled: DataStorage.isEmailNotificationsEnabled(),
         recipients: [
           {
             name: user.residentName,
@@ -262,6 +289,11 @@ export default function MailerPage() {
 
   // Action: Send to a particular user directly
   const handleSendToParticularUser = async (user: UserRecipientItem) => {
+    if (!DataStorage.isEmailNotificationsEnabled()) {
+      toast.error("Email notifications are currently toggled OFF. Turn ON notifications in the header to dispatch emails.");
+      return;
+    }
+
     if (!user.email) {
       toast.error(`Flat ${user.flatNumber} has no email address. Please update resident contact in Masters.`);
       return;
@@ -317,6 +349,11 @@ export default function MailerPage() {
 
   // Action: Send to selected users one by one with sequential status updates
   const handleSendBatchOneByOne = async () => {
+    if (!DataStorage.isEmailNotificationsEnabled()) {
+      toast.error("Email notifications are currently toggled OFF. Turn ON notifications in the header to dispatch emails.");
+      return;
+    }
+
     const selectedTargets = recipientsList.filter((u) => selectedUserIds.has(u.id));
     if (selectedTargets.length === 0) {
       toast.error("Please select at least one resident to send email.");
@@ -399,6 +436,11 @@ export default function MailerPage() {
 
   // 9:00 AM Cron Execution
   const handleRunDailyCron = async () => {
+    if (!DataStorage.isEmailNotificationsEnabled()) {
+      toast.error("Email notifications are currently toggled OFF. Turn ON notifications in the header to run cron reminders.");
+      return;
+    }
+
     setSendingCron(true);
     try {
       const unpaidTargets = recipientsList.filter((u) => u.outstandingDues > 0 && u.email);
@@ -447,6 +489,7 @@ export default function MailerPage() {
         body: JSON.stringify({
           flatsWithDues: unpaidFlatsPayload,
           society: currentSoc,
+          emailNotificationsEnabled: DataStorage.isEmailNotificationsEnabled(),
         }),
       });
 
@@ -558,7 +601,32 @@ export default function MailerPage() {
         subtitle="Select any user to dispatch maintenance notices with live status tracking, execute 9:00 AM daily cron, and inspect delivery logs"
         breadcrumbs={[{ label: "Mailer" }]}
         actions={
-          <div className="toolbar-actions">
+          <div className="d-flex align-items-center gap-2 flex-wrap toolbar-actions">
+            {/* Master Email Notifications Toggle Button */}
+            <div className="bg-white border rounded-3 p-1.5 px-3 d-inline-flex align-items-center gap-2 shadow-sm">
+              <div className="form-check form-switch mb-0 d-flex align-items-center gap-2">
+                <input
+                  className="form-check-input cursor-pointer"
+                  type="checkbox"
+                  role="switch"
+                  id="mailerMasterEmailToggle"
+                  checked={emailNotificationsEnabled}
+                  onChange={(e) => handleToggleEmailNotifications(e.target.checked)}
+                  style={{ width: "2.4em", height: "1.25em", cursor: "pointer" }}
+                />
+                <label
+                  className="form-check-label fw-bold text-dark small cursor-pointer mb-0 d-flex align-items-center gap-1.5"
+                  htmlFor="mailerMasterEmailToggle"
+                >
+                  <Mail size={15} className={emailNotificationsEnabled ? "text-success" : "text-danger"} />
+                  <span>Email Notifications:</span>
+                  <span className={`badge ${emailNotificationsEnabled ? "bg-success text-white" : "bg-danger text-white"} py-0.5 px-2`}>
+                    {emailNotificationsEnabled ? "ON" : "OFF"}
+                  </span>
+                </label>
+              </div>
+            </div>
+
             <button
               className="btn btn-outline-primary"
               onClick={() => setShowPreviewModal(true)}
@@ -569,7 +637,8 @@ export default function MailerPage() {
             <button
               className="btn btn-primary-custom"
               onClick={handleRunDailyCron}
-              disabled={sendingCron || isBatchSending}
+              disabled={sendingCron || isBatchSending || !emailNotificationsEnabled}
+              title={!emailNotificationsEnabled ? "Email notifications are toggled OFF" : "Run 9:00 AM Cron"}
             >
               {sendingCron ? (
                 <span className="spinner-border spinner-border-sm me-1" />
@@ -581,6 +650,28 @@ export default function MailerPage() {
           </div>
         }
       />
+
+      {/* Global Notice Banner when Notifications are OFF */}
+      {!emailNotificationsEnabled && (
+        <div className="alert alert-warning border-warning shadow-sm rounded-4 p-3 mb-4 d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div className="d-flex align-items-center gap-2">
+            <BellOff size={22} className="text-warning-emphasis flex-shrink-0" />
+            <div>
+              <strong className="text-dark">Email Notifications Are Paused (OFF)</strong>
+              <div className="small text-secondary">
+                All outgoing email notifications (payment receipts, maintenance reminders, and announcements) are blocked. Toggle ON to resume.
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn btn-sm btn-warning text-dark fw-bold"
+            onClick={() => handleToggleEmailNotifications(true)}
+          >
+            Turn Email Notifications ON
+          </button>
+        </div>
+      )}
 
       {/* Top Banner: 9:00 AM Cron & Secure SMTP Status */}
       <div className="row g-3 mb-4">

@@ -22,7 +22,16 @@ async function handleCronExecution(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { flatsWithDues, society } = body;
+    const { flatsWithDues, society, emailNotificationsEnabled } = body;
+
+    // Check if email notifications are master-toggled off
+    if (emailNotificationsEnabled === false) {
+      return NextResponse.json({
+        success: false,
+        message: "Email notifications are disabled by admin in settings. Automated reminder cron skipped.",
+        skipped: true,
+      });
+    }
 
     const societyInfo = society || {
       name: "Parijat Cooperative Housing Society - A Wing",
