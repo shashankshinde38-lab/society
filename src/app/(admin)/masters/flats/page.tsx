@@ -322,11 +322,17 @@ export default function FlatsPage() {
         >
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content border-0 shadow-lg rounded-4">
-              <div className="modal-header border-bottom px-4 pt-4 pb-3">
-                <h5 className="modal-title fw-bold text-dark">
+              <div className="modal-header border-bottom px-4 pt-4 pb-3 d-flex justify-content-between align-items-start">
+                <h5 className="modal-title fw-bold text-dark mb-0">
                   {editingFlat ? `Edit Flat ${editingFlat.flat_number}` : "Add New Flat"}
                 </h5>
-                <button type="button" className="btn-close" onClick={() => setShowModal(false)} />
+                <button
+                  type="button"
+                  className="btn-close ms-2 mt-1 flex-shrink-0"
+                  onClick={() => setShowModal(false)}
+                  aria-label="Close"
+                  title="Close"
+                />
               </div>
 
               <form onSubmit={handleSave}>
@@ -455,7 +461,7 @@ export default function FlatsPage() {
         >
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content border-0 shadow-lg rounded-4">
-              <div className="modal-header border-bottom px-4 pt-4 pb-3">
+              <div className="modal-header border-bottom px-4 pt-4 pb-3 d-flex justify-content-between align-items-start">
                 <div className="d-flex align-items-center gap-2">
                   <div className="p-2 bg-danger-subtle text-danger rounded-circle">
                     <Trash2 size={20} />
@@ -469,11 +475,13 @@ export default function FlatsPage() {
                 </div>
                 <button
                   type="button"
-                  className="btn-close"
+                  className="btn-close ms-2 mt-1 flex-shrink-0"
                   onClick={() => {
                     setDeleteTargetFlat(null);
                     setFlatDependencies(null);
                   }}
+                  aria-label="Close"
+                  title="Close"
                 />
               </div>
 

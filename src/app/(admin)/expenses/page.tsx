@@ -106,7 +106,10 @@ export default function ExpensesPage() {
 
           fetch("/api/mailer/send", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "x-email-notifications-enabled": String(DataStorage.isEmailNotificationsEnabled()),
+            },
             body: JSON.stringify({
               type: "EXPENSE_ALERT",
               recipients: recipientPayload,
@@ -374,9 +377,15 @@ export default function ExpensesPage() {
         >
           <div className="modal-dialog modal-dialog-centered modal-lg expenses-modal-dialog">
             <div className="modal-content border-0 shadow-lg rounded-4 expenses-modal-content">
-              <div className="modal-header border-bottom px-4 pt-4 pb-3">
-                <h5 id="expense-modal-title" className="modal-title fw-bold text-dark">Record Society Expense</h5>
-                <button type="button" className="btn-close" onClick={() => setShowAddModal(false)} />
+              <div className="modal-header border-bottom px-4 pt-4 pb-3 d-flex justify-content-between align-items-start">
+                <h5 id="expense-modal-title" className="modal-title fw-bold text-dark mb-0">Record Society Expense</h5>
+                <button
+                  type="button"
+                  className="btn-close ms-2 mt-1 flex-shrink-0"
+                  onClick={() => setShowAddModal(false)}
+                  aria-label="Close"
+                  title="Close"
+                />
               </div>
 
               <form onSubmit={handleSaveExpense}>

@@ -125,7 +125,22 @@ export const DataStorage = {
     const stored = getStoredItem<MaintenanceSettings>("settings", initialSettings);
     const ownerAmount = stored.owner_monthly_amount ?? stored.monthly_amount ?? 1100;
     const tenantAmount = stored.tenant_monthly_amount ?? 1500;
-    const emailEnabled = stored.email_notifications_enabled ?? true;
+
+    // Check standalone unversioned key and cookie first to ensure persistence across versions
+    let emailEnabled = stored.email_notifications_enabled ?? true;
+    if (typeof window !== "undefined") {
+      const standalone = window.localStorage.getItem("parijat_master_email_notifications_toggle");
+      if (standalone === "false") {
+        emailEnabled = false;
+      } else if (standalone === "true") {
+        emailEnabled = true;
+      } else {
+        const match = document.cookie.match(/(?:^|; )email_notifications_enabled=([^;]*)/);
+        if (match && match[1] === "false") emailEnabled = false;
+        else if (match && match[1] === "true") emailEnabled = true;
+      }
+    }
+
     return {
       ...initialSettings,
       ...stored,
@@ -136,12 +151,27 @@ export const DataStorage = {
     };
   },
   isEmailNotificationsEnabled(): boolean {
+    if (typeof window !== "undefined") {
+      const standalone = window.localStorage.getItem("parijat_master_email_notifications_toggle");
+      if (standalone === "false") return false;
+      if (standalone === "true") return true;
+
+      const match = document.cookie.match(/(?:^|; )email_notifications_enabled=([^;]*)/);
+      if (match && match[1] === "false") return false;
+      if (match && match[1] === "true") return true;
+    }
     const settings = this.getSettings();
     return settings.email_notifications_enabled !== false;
   },
   setEmailNotificationsEnabled(enabled: boolean): boolean {
     this.updateSettings({ email_notifications_enabled: enabled });
     if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem("parijat_master_email_notifications_toggle", String(enabled));
+        document.cookie = `email_notifications_enabled=${enabled}; path=/; max-age=31536000; SameSite=Lax`;
+      } catch {
+        // ignore storage errors
+      }
       window.dispatchEvent(new CustomEvent("email_notifications_toggled", { detail: { enabled } }));
     }
     return enabled;

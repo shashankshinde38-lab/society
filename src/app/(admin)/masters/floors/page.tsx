@@ -217,14 +217,16 @@ export default function FloorsPage() {
         >
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content border-0 shadow-lg rounded-4">
-              <div className="modal-header border-bottom px-4 pt-4 pb-3">
-                <h5 className="modal-title fw-bold text-dark">
+              <div className="modal-header border-bottom px-4 pt-4 pb-3 d-flex justify-content-between align-items-start">
+                <h5 className="modal-title fw-bold text-dark mb-0">
                   {editingFloor ? "Edit Floor" : "Add New Floor"}
                 </h5>
                 <button
                   type="button"
-                  className="btn-close"
+                  className="btn-close ms-2 mt-1 flex-shrink-0"
                   onClick={() => setShowModal(false)}
+                  aria-label="Close"
+                  title="Close"
                 />
               </div>
 
@@ -289,7 +291,7 @@ export default function FloorsPage() {
         >
           <div className="modal-dialog modal-dialog-centered modal-lg">
             <div className="modal-content border-0 shadow-lg rounded-4">
-              <div className="modal-header border-bottom px-4 pt-4 pb-3">
+              <div className="modal-header border-bottom px-4 pt-4 pb-3 d-flex justify-content-between align-items-start">
                 <div className="d-flex align-items-center gap-2">
                   <div className="p-2 bg-danger-subtle text-danger rounded-circle">
                     <Trash2 size={20} />
@@ -303,11 +305,13 @@ export default function FloorsPage() {
                 </div>
                 <button
                   type="button"
-                  className="btn-close"
+                  className="btn-close ms-2 mt-1 flex-shrink-0"
                   onClick={() => {
                     setDeleteTargetFloor(null);
                     setFloorDependencies(null);
                   }}
+                  aria-label="Close"
+                  title="Close"
                 />
               </div>
 

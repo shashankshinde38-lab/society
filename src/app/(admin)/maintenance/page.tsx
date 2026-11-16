@@ -445,7 +445,10 @@ export default function MaintenancePage() {
 
       const res = await fetch("/api/mailer/send", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-email-notifications-enabled": String(DataStorage.isEmailNotificationsEnabled()),
+        },
         body: JSON.stringify({
           type: "PAYMENT_RECEIPT",
           society: currentSoc,
@@ -528,6 +531,8 @@ export default function MaintenancePage() {
         const curM = new Date().getMonth() + 1;
         const curInv = flatYearInvs.find((i) => i.month === curM);
         matchesStatus = curInv ? (curInv.status === "UNPAID" || curInv.status === "PARTIAL") : flatYearDue > 0;
+      } else if (selectedYear > 2026) {
+        matchesStatus = flatYearDue > 0 || flatYearPaid === 0;
       } else {
         matchesStatus = flatYearDue > 0;
       }
@@ -1675,18 +1680,19 @@ export default function MaintenancePage() {
                   type="button"
                   className="btn btn-sm position-absolute top-0 end-0 m-3 p-1 rounded-circle d-flex align-items-center justify-content-center text-white"
                   style={{
-                    background: "rgba(255, 255, 255, 0.18)",
-                    border: "1px solid rgba(255, 255, 255, 0.3)",
-                    width: "32px",
-                    height: "32px",
+                    background: "rgba(255, 255, 255, 0.22)",
+                    border: "1px solid rgba(255, 255, 255, 0.4)",
+                    width: "36px",
+                    height: "36px",
                     cursor: "pointer",
+                    zIndex: 25,
                     transition: "all 0.15s ease",
                   }}
                   onClick={() => setShowReceiptModal(false)}
                   aria-label="Close"
                   title="Close (Esc)"
                 >
-                  <X size={18} />
+                  <X size={20} />
                 </button>
 
                 <div className="d-flex align-items-center gap-2 mb-2 pe-5">

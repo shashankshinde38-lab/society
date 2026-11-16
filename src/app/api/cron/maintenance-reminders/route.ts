@@ -24,11 +24,22 @@ async function handleCronExecution(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const { flatsWithDues, society, emailNotificationsEnabled } = body;
 
-    // Check if email notifications are master-toggled off
-    if (emailNotificationsEnabled === false) {
+    // Strict multi-layer suppression barrier: Check cookie, header, search param, body flags, and env
+    const cookieToggle = req.cookies.get("email_notifications_enabled")?.value;
+    const headerToggle = req.headers.get("x-email-notifications-enabled");
+    const queryToggle = req.nextUrl?.searchParams?.get("emailNotificationsEnabled");
+    const isSuppressed =
+      cookieToggle === "false" ||
+      headerToggle === "false" ||
+      queryToggle === "false" ||
+      emailNotificationsEnabled === false ||
+      body?.email_notifications_enabled === false ||
+      process.env.EMAIL_NOTIFICATIONS_ENABLED === "false";
+
+    if (isSuppressed) {
       return NextResponse.json({
         success: false,
-        message: "Email notifications are disabled by admin in settings. Automated reminder cron skipped.",
+        message: "Email notifications are disabled by admin in settings (Master Toggle is OFF). Automated reminder cron skipped.",
         skipped: true,
       });
     }

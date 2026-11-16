@@ -74,6 +74,7 @@ export async function sendEmail({
   text,
   replyTo,
   attachments,
+  suppressed,
 }: {
   to: string | string[];
   subject: string;
@@ -81,7 +82,18 @@ export async function sendEmail({
   text?: string;
   replyTo?: string;
   attachments?: EmailAttachment[];
-}): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  suppressed?: boolean;
+}): Promise<{ success: boolean; messageId?: string; error?: string; skipped?: boolean }> {
+  // Master suppression check: If toggle is off, never contact SMTP server
+  if (suppressed === true || process.env.EMAIL_NOTIFICATIONS_ENABLED === "false") {
+    console.log("[EMAIL_SUPPRESSED] Outgoing email blocked because master notifications are disabled:", { to, subject });
+    return {
+      success: false,
+      skipped: true,
+      error: "Email notifications are disabled by Admin (Master Toggle is OFF). No emails were sent.",
+    };
+  }
+
   const config = getSmtpConfig();
   const transporter = getTransporter();
 

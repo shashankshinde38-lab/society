@@ -238,7 +238,10 @@ export default function MailerPage() {
 
     const res = await fetch("/api/mailer/send", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-email-notifications-enabled": String(DataStorage.isEmailNotificationsEnabled()),
+      },
       body: JSON.stringify({
         type: emailType,
         society: currentSoc,
@@ -485,7 +488,10 @@ export default function MailerPage() {
 
       const res = await fetch("/api/cron/maintenance-reminders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-email-notifications-enabled": String(DataStorage.isEmailNotificationsEnabled()),
+        },
         body: JSON.stringify({
           flatsWithDues: unpaidFlatsPayload,
           society: currentSoc,
@@ -1128,12 +1134,18 @@ export default function MailerPage() {
         >
           <div className="modal-dialog modal-dialog-centered modal-lg">
             <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
-              <div className="modal-header border-bottom px-4 pt-4 pb-3">
+              <div className="modal-header border-bottom px-4 pt-4 pb-3 d-flex justify-content-between align-items-start">
                 <div className="d-flex align-items-center gap-2">
                   <Eye size={20} className="text-primary" />
                   <h5 className="modal-title fw-bold text-dark mb-0">Dynamic HTML Email Preview &mdash; Maintenance Reminder</h5>
                 </div>
-                <button type="button" className="btn-close" onClick={() => setShowPreviewModal(false)} />
+                <button
+                  type="button"
+                  className="btn-close ms-2 mt-1 flex-shrink-0"
+                  onClick={() => setShowPreviewModal(false)}
+                  aria-label="Close"
+                  title="Close"
+                />
               </div>
 
               {/* Dynamic Flat Selector & App Setup Indicator */}

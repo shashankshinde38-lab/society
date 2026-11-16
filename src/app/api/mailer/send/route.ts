@@ -40,14 +40,30 @@ export async function POST(req: NextRequest) {
       emailNotificationsEnabled,
     } = body;
 
-    // Check if email notifications are master-toggled off
-    if (emailNotificationsEnabled === false) {
+    // Strict multi-layer suppression barrier: Check cookie, header, body flags, and env
+    const cookieToggle = req.cookies.get("email_notifications_enabled")?.value;
+    const headerToggle = req.headers.get("x-email-notifications-enabled");
+    const isSuppressed =
+      cookieToggle === "false" ||
+      headerToggle === "false" ||
+      emailNotificationsEnabled === false ||
+      body.email_notifications_enabled === false ||
+      process.env.EMAIL_NOTIFICATIONS_ENABLED === "false";
+
+    if (isSuppressed) {
       return NextResponse.json(
         {
           success: false,
-          message: "Email notifications are currently disabled by Admin. No emails were sent.",
+          message: "Email notifications are currently disabled by Admin (Master Toggle is OFF). No emails were sent.",
           code: "EMAIL_NOTIFICATIONS_DISABLED",
           skipped: true,
+          results: (recipients || []).map((r: any) => ({
+            recipient: r.name || "Recipient",
+            email: r.email || "",
+            flat: r.flatNumber || "-",
+            status: "SKIPPED",
+            error: "Email notifications are disabled by Admin (Master Toggle is OFF)",
+          })),
         },
         { status: 200 }
       );
