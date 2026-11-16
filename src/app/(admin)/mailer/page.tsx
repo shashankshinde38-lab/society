@@ -576,20 +576,20 @@ export default function MailerPage() {
     upi_id: "parijatsociety@okhdfcbank",
   };
 
-  // Status counters for recipients
+  // Status counters for recipients (Dynamically reflects filtered users in view)
   const statusCounts = useMemo(() => {
     let sent = 0;
     let pending = 0;
     let failed = 0;
     let idle = 0;
-    recipientsList.forEach((u) => {
+    filteredUsers.forEach((u) => {
       if (u.status === "SENT") sent++;
       else if (u.status === "PENDING") pending++;
       else if (u.status === "FAILED") failed++;
       else idle++;
     });
     return { sent, pending, failed, idle };
-  }, [recipientsList]);
+  }, [filteredUsers]);
 
   // Filtered Audit Logs
   const filteredAuditLogs = useMemo(() => {

@@ -192,7 +192,9 @@ export default function ExpensesPage() {
     toast.info("Expense filters reset to defaults");
   };
 
-  const totalExpenseSum = expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  // Dynamic calculations based on active filters
+  const filteredExpenseSum = filteredExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const filteredCategoriesCount = new Set(filteredExpenses.map((e) => e.category_id)).size;
 
   return (
     <div className="expenses-page">
@@ -208,34 +210,39 @@ export default function ExpensesPage() {
         }
       />
 
-      {/* Top Expense KPI Summary Cards */}
+      {/* Top Expense KPI Summary Cards (Dynamically reflects active filters) */}
       <div className="row g-3 mb-4 expenses-kpi-grid">
         <div className="col-12 col-sm-6 col-lg-4">
-          <div className="stat-card border-start border-4 border-warning">
-            <div className="stat-title">Total Expenses Recorded</div>
-            <div className="stat-value text-dark">₹{totalExpenseSum.toLocaleString()}</div>
+          <div className="stat-card border-start border-4 border-warning h-100">
+            <div className="stat-title">{isFilterActive ? "Filtered Expenses" : "Total Expenses Recorded"}</div>
+            <div className="stat-value text-dark">₹{filteredExpenseSum.toLocaleString()}</div>
             <div className="small text-secondary mt-1">
-              Across <strong className="text-dark">{expenses.length}</strong> audited vouchers
+              Across <strong className="text-dark">{filteredExpenses.length}</strong>{" "}
+              {isFilterActive ? `of ${expenses.length} audited vouchers` : "audited vouchers"}
             </div>
           </div>
         </div>
 
         <div className="col-12 col-sm-6 col-lg-4">
-          <div className="stat-card border-start border-4 border-primary">
-            <div className="stat-title">Wallet Impact</div>
+          <div className="stat-card border-start border-4 border-primary h-100">
+            <div className="stat-title">{isFilterActive ? "Filtered Wallet Impact" : "Wallet Impact"}</div>
             <div className="stat-value text-danger d-flex align-items-center gap-1">
               <TrendingDown size={22} />
-              <span>-₹{totalExpenseSum.toLocaleString()}</span>
+              <span>-₹{filteredExpenseSum.toLocaleString()}</span>
             </div>
             <div className="small text-secondary mt-1">Automatically deducted from ledger</div>
           </div>
         </div>
 
         <div className="col-12 col-sm-6 col-lg-4">
-          <div className="stat-card border-start border-4 border-info">
-            <div className="stat-title">Active Categories</div>
-            <div className="stat-value text-dark">{categories.length}</div>
-            <div className="small text-secondary mt-1">Electricity, Lift AMC, Watchman, etc.</div>
+          <div className="stat-card border-start border-4 border-info h-100">
+            <div className="stat-title">{isFilterActive ? "Categories in View" : "Active Categories"}</div>
+            <div className="stat-value text-dark">{isFilterActive ? filteredCategoriesCount : categories.length}</div>
+            <div className="small text-secondary mt-1">
+              {isFilterActive
+                ? `${filteredCategoriesCount} of ${categories.length} categories represented`
+                : "Electricity, Lift AMC, Watchman, etc."}
+            </div>
           </div>
         </div>
       </div>

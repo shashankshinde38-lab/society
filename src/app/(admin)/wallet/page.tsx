@@ -70,6 +70,16 @@ export default function WalletPage() {
   const currentWalletBalance =
     transactions.length > 0 ? transactions[0].running_balance : openingBalance;
 
+  // Dynamic filter-aware credits and debits
+  const displayTransactions = isFilterActive ? filteredTransactions : transactions;
+  const displayCredits = displayTransactions
+    .filter((t) => t.transaction_type === "CREDIT" && t.category !== "OPENING_BALANCE")
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+  const displayDebits = displayTransactions
+    .filter((t) => t.transaction_type === "DEBIT")
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
   const handleExportCSV = () => {
     if (transactions.length === 0) return;
     const headers = ["Date", "Transaction Type", "Category", "Amount", "Running Balance", "Description"];
@@ -154,29 +164,37 @@ export default function WalletPage() {
 
         {/* Total Collections (Credits) */}
         <div className="col-12 col-sm-6 col-lg-3">
-          <div className="stat-card border-start border-4 border-success">
+          <div className="stat-card border-start border-4 border-success h-100">
             <div className="d-flex justify-content-between align-items-center mb-2">
-              <span className="stat-title">Total Maintenance Credits</span>
+              <span className="stat-title">{isFilterActive ? "Filtered Credits" : "Total Maintenance Credits"}</span>
               <div className="stat-icon-wrapper bg-success-subtle text-success">
                 <ArrowUpRight size={22} />
               </div>
             </div>
-            <div className="stat-value text-success fs-3">+₹{totalCredits.toLocaleString()}</div>
-            <div className="small text-secondary mt-1">Actual cash &amp; online received</div>
+            <div className="stat-value text-success fs-3">+₹{displayCredits.toLocaleString()}</div>
+            <div className="small text-secondary mt-1">
+              {isFilterActive
+                ? `${displayTransactions.filter((t) => t.transaction_type === "CREDIT" && t.category !== "OPENING_BALANCE").length} credit transactions`
+                : "Actual cash & online received"}
+            </div>
           </div>
         </div>
 
         {/* Total Expenses (Debits) */}
         <div className="col-12 col-sm-6 col-lg-3">
-          <div className="stat-card border-start border-4 border-danger">
+          <div className="stat-card border-start border-4 border-danger h-100">
             <div className="d-flex justify-content-between align-items-center mb-2">
-              <span className="stat-title">Total Society Debits</span>
+              <span className="stat-title">{isFilterActive ? "Filtered Debits" : "Total Society Debits"}</span>
               <div className="stat-icon-wrapper bg-danger-subtle text-danger">
                 <ArrowDownRight size={22} />
               </div>
             </div>
-            <div className="stat-value text-danger fs-3">-₹{totalDebits.toLocaleString()}</div>
-            <div className="small text-secondary mt-1">Audited vendor &amp; utility payments</div>
+            <div className="stat-value text-danger fs-3">-₹{displayDebits.toLocaleString()}</div>
+            <div className="small text-secondary mt-1">
+              {isFilterActive
+                ? `${displayTransactions.filter((t) => t.transaction_type === "DEBIT").length} debit transactions`
+                : "Audited vendor & utility payments"}
+            </div>
           </div>
         </div>
       </div>

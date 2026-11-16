@@ -544,29 +544,76 @@ export default function MaintenancePage() {
     return matchesSearch && matchesFloor && matchesType && matchesStatus;
   });
 
-  // Calculate Overview Stats for selectedYear
+  // Calculate Overview Stats dynamically based on filteredFlats and selectedYear
+  const currentMonthNum = new Date().getMonth() + 1;
+  const currentMonthName = MONTH_NAMES[currentMonthNum - 1] || "Current Month";
+
   const yearInvoices = invoices.filter((i) => i.year === selectedYear);
   const yearPayments = payments.filter((p) => {
     const pYear = p.payment_date ? new Date(p.payment_date).getFullYear() : 2026;
     return pYear === selectedYear;
   });
 
-  const totalFlatsCount = flats.length;
-  const paidFlatsCount = flats.filter((f) => {
-    const fInvs = yearInvoices.filter((i) => i.flat_id === f.id);
-    const dues = fInvs.reduce((sum, i) => sum + Number(i.due_amount || 0), 0);
-    const paid = fInvs.reduce((sum, i) => sum + Number(i.paid_amount || 0), 0);
-    return paid > 0 && dues === 0;
-  }).length;
-  const unpaidFlatsCount = flats.filter((f) => {
-    const dues = yearInvoices
-      .filter((i) => i.flat_id === f.id)
-      .reduce((sum, i) => sum + Number(i.due_amount || 0), 0);
-    return dues > 0;
-  }).length;
-  const totalPendingSum = yearInvoices.reduce((sum, i) => sum + Number(i.due_amount || 0), 0);
-  const totalCollectedSum = yearPayments.reduce((sum, p) => sum + Number(p.total_amount_received || 0), 0);
-  const advancePoolSum = flats.reduce((sum, f) => sum + Number(f.advance_balance || 0), 0);
+  const filteredFlatIds = new Set(filteredFlats.map((f) => f.id));
+  const filteredYearInvoices = yearInvoices.filter((i) => filteredFlatIds.has(i.flat_id));
+  const filteredYearPayments = yearPayments.filter((p) => filteredFlatIds.has(p.flat_id));
+
+  const totalFlatsCount = filteredFlats.length;
+  const totalCollectedSum = filteredYearPayments.reduce(
+    (sum, p) => sum + Number(p.total_amount_received || 0),
+    0
+  );
+
+  let paidFlatsCount = 0;
+  let unpaidFlatsCount = 0;
+  let earlierPendingSum = 0;
+  let earlierPendingFlatsCount = 0;
+  let currentMonthPendingSum = 0;
+  let currentMonthPendingFlatsCount = 0;
+  let totalPendingSum = 0;
+
+  filteredFlats.forEach((flat) => {
+    const flatInvs = filteredYearInvoices.filter((i) => i.flat_id === flat.id);
+    const flatYearDue = flatInvs.reduce((sum, i) => sum + Number(i.due_amount || 0), 0);
+    const flatYearPaid = flatInvs.reduce((sum, i) => sum + Number(i.paid_amount || 0), 0);
+
+    if (flatYearDue > 0) {
+      unpaidFlatsCount++;
+    } else if (flatYearPaid > 0) {
+      paidFlatsCount++;
+    }
+
+    totalPendingSum += flatYearDue;
+
+    // Earlier maintenance dues (all invoices prior to current month in selected cycle or prior years)
+    const earlierInvs = invoices.filter(
+      (i) =>
+        i.flat_id === flat.id &&
+        (i.year < selectedYear || (i.year === selectedYear && i.month < currentMonthNum))
+    );
+    const flatEarlierDue = earlierInvs.reduce((sum, i) => sum + Number(i.due_amount || 0), 0);
+    if (flatEarlierDue > 0) {
+      earlierPendingSum += flatEarlierDue;
+      earlierPendingFlatsCount++;
+    }
+
+    // Current month dues
+    if (selectedYear === 2026) {
+      const curInv = invoices.find(
+        (i) => i.flat_id === flat.id && i.year === selectedYear && i.month === currentMonthNum
+      );
+      const flatCurDue = curInv ? Number(curInv.due_amount || 0) : 0;
+      if (flatCurDue > 0) {
+        currentMonthPendingSum += flatCurDue;
+        currentMonthPendingFlatsCount++;
+      }
+    }
+  });
+
+  const advancePoolSum = filteredFlats.reduce(
+    (sum, f) => sum + Number(f.advance_balance || 0),
+    0
+  );
 
   const isFlatsFilterActive =
     searchTerm.trim() !== "" ||
@@ -660,10 +707,11 @@ export default function MaintenancePage() {
         }
       />
 
-      {/* Top Financial KPI Metric Row */}
+      {/* Top Financial KPI Metric Row (Dynamically calculated based on active filters) */}
       <div className="row g-3 mb-4 maintenance-kpi-grid">
-        <div className="col-6 col-lg-3">
-          <div className="stat-card border-start border-4 border-success">
+        {/* 1. Total Collected */}
+        <div className="col-12 col-sm-6 col-lg-4 col-xl">
+          <div className="stat-card border-start border-4 border-success h-100">
             <div className="stat-title">Total Collected ({selectedYear})</div>
             <div className="stat-value text-success">₹{totalCollectedSum.toLocaleString()}</div>
             <div className="small text-secondary mt-1">
@@ -678,8 +726,53 @@ export default function MaintenancePage() {
           </div>
         </div>
 
-        <div className="col-6 col-lg-3">
-          <div className="stat-card border-start border-4 border-danger">
+        {/* 2. Earlier Pending Dues (Arrears) */}
+        <div className="col-12 col-sm-6 col-lg-4 col-xl">
+          <div className="stat-card border-start border-4 border-warning h-100">
+            <div className="stat-title d-flex align-items-center justify-content-between">
+              <span>Earlier Pending Dues</span>
+              <span className="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle" style={{ fontSize: "0.68rem" }}>
+                Arrears
+              </span>
+            </div>
+            <div className="stat-value text-warning-emphasis">₹{earlierPendingSum.toLocaleString()}</div>
+            <div className="small text-secondary mt-1">
+              {selectedYear > 2026 && earlierPendingSum === 0 ? (
+                <span className="text-muted">No past dues</span>
+              ) : (
+                <>
+                  <span className="fw-bold text-dark">{earlierPendingFlatsCount}</span> Flats with Past Dues
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Current Month Pending Dues */}
+        <div className="col-12 col-sm-6 col-lg-4 col-xl">
+          <div className="stat-card border-start border-4 border-danger h-100">
+            <div className="stat-title d-flex align-items-center justify-content-between">
+              <span>Current Month Pending</span>
+              <span className="badge bg-danger-subtle text-danger border border-danger-subtle" style={{ fontSize: "0.68rem" }}>
+                {selectedYear === 2026 ? currentMonthName : `${selectedYear}`}
+              </span>
+            </div>
+            <div className="stat-value text-danger">₹{currentMonthPendingSum.toLocaleString()}</div>
+            <div className="small text-secondary mt-1">
+              {selectedYear > 2026 ? (
+                <span className="text-muted">Billing not started yet</span>
+              ) : (
+                <>
+                  <span className="fw-bold text-danger">{currentMonthPendingFlatsCount}</span> Flats Pending This Month
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 4. Total Pending Dues (Combined) */}
+        <div className="col-12 col-sm-6 col-lg-4 col-xl">
+          <div className="stat-card border-start border-4 border-danger h-100" style={{ background: "rgba(239, 68, 68, 0.02)" }}>
             <div className="stat-title">Total Pending Dues ({selectedYear})</div>
             <div className="stat-value text-danger">₹{totalPendingSum.toLocaleString()}</div>
             <div className="small text-secondary mt-1">
@@ -694,19 +787,12 @@ export default function MaintenancePage() {
           </div>
         </div>
 
-        <div className="col-6 col-lg-3">
-          <div className="stat-card border-start border-4 border-primary">
+        {/* 5. Advance Maintenance Pool */}
+        <div className="col-12 col-sm-6 col-lg-4 col-xl">
+          <div className="stat-card border-start border-4 border-primary h-100">
             <div className="stat-title">Advance Maintenance Pool</div>
             <div className="stat-value text-primary">₹{advancePoolSum.toLocaleString()}</div>
             <div className="small text-secondary mt-1">Auto-allocates month by month</div>
-          </div>
-        </div>
-
-        <div className="col-6 col-lg-3">
-          <div className="stat-card border-start border-4 border-info">
-            <div className="stat-title">Monthly Rate Base</div>
-            <div className="stat-value text-dark">₹1,100</div>
-            <div className="small text-secondary mt-1">Due on 10th of each month</div>
           </div>
         </div>
       </div>
