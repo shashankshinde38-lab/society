@@ -30,6 +30,7 @@ import {
   Edit2,
   Settings2,
   BellOff,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
@@ -565,6 +566,29 @@ export default function MaintenancePage() {
   const totalCollectedSum = yearPayments.reduce((sum, p) => sum + Number(p.total_amount_received || 0), 0);
   const advancePoolSum = flats.reduce((sum, f) => sum + Number(f.advance_balance || 0), 0);
 
+  const isFlatsFilterActive =
+    searchTerm.trim() !== "" ||
+    floorFilter !== "ALL" ||
+    typeFilter !== "ALL" ||
+    statusFilter !== "ALL" ||
+    selectedYear !== 2026;
+
+  const handleResetFlatsFilters = () => {
+    setSearchTerm("");
+    setFloorFilter("ALL");
+    setTypeFilter("ALL");
+    setStatusFilter("ALL");
+    setSelectedYear(2026);
+    toast.info("All maintenance filters reset to defaults");
+  };
+
+  const isPaymentsFilterActive = paymentYearFilter !== "ALL";
+
+  const handleResetPaymentsFilter = () => {
+    setPaymentYearFilter("ALL");
+    toast.info("Payment year filter reset to All Years");
+  };
+
   return (
     <div className="maintenance-page">
       <PageHeader
@@ -770,10 +794,31 @@ export default function MaintenancePage() {
                     );
                   })}
                 </select>
+
+                {isFlatsFilterActive && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 flex-shrink-0"
+                    onClick={handleResetFlatsFilters}
+                    title="Reset all filters back to default"
+                  >
+                    <RotateCcw size={13} />
+                    <span>Reset Filters</span>
+                  </button>
+                )}
               </div>
 
-              <div className="small text-secondary">
-                Showing <strong className="text-dark">{filteredFlats.length}</strong> Flats
+              <div className="small text-secondary d-flex align-items-center gap-2">
+                <span>Showing <strong className="text-dark">{filteredFlats.length}</strong> Flats</span>
+                {isFlatsFilterActive && (
+                  <button
+                    type="button"
+                    className="btn btn-link btn-sm p-0 text-danger text-decoration-none small"
+                    onClick={handleResetFlatsFilters}
+                  >
+                    (Clear)
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -799,7 +844,22 @@ export default function MaintenancePage() {
                   {filteredFlats.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="text-center py-5 text-secondary">
-                        {searchTerm ? `No flats matching "${searchTerm}"` : "No flats added yet. Add flats in Masters > Flats."}
+                        <div className="d-flex flex-column align-items-center gap-2">
+                          <Building size={32} className="text-muted opacity-50 mb-1" />
+                          <div>
+                            {searchTerm ? `No flats matching "${searchTerm}"` : "No flats matching selected filters."}
+                          </div>
+                          {isFlatsFilterActive && (
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5 mt-1"
+                              onClick={handleResetFlatsFilters}
+                            >
+                              <RotateCcw size={13} />
+                              <span>Reset All Filters</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ) : (
@@ -981,9 +1041,29 @@ export default function MaintenancePage() {
                       );
                     })}
                   </div>
+                  {isPaymentsFilterActive && (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 ms-2"
+                      onClick={handleResetPaymentsFilter}
+                      title="Reset filter to show all years"
+                    >
+                      <RotateCcw size={13} />
+                      <span>Reset</span>
+                    </button>
+                  )}
                 </div>
-                <div className="small text-secondary">
-                  Showing <strong className="text-dark">{filteredPayments.length}</strong> Receipts
+                <div className="small text-secondary d-flex align-items-center gap-2">
+                  <span>Showing <strong className="text-dark">{filteredPayments.length}</strong> Receipts</span>
+                  {isPaymentsFilterActive && (
+                    <button
+                      type="button"
+                      className="btn btn-link btn-sm p-0 text-danger text-decoration-none small"
+                      onClick={handleResetPaymentsFilter}
+                    >
+                      (Show All)
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1006,7 +1086,20 @@ export default function MaintenancePage() {
                     {filteredPayments.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="text-center py-5 text-secondary">
-                          No maintenance payments recorded for the selected filter.
+                          <div className="d-flex flex-column align-items-center gap-2">
+                            <CreditCard size={32} className="text-muted opacity-50 mb-1" />
+                            <div>No maintenance payments recorded for the selected filter.</div>
+                            {isPaymentsFilterActive && (
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5 mt-1"
+                                onClick={handleResetPaymentsFilter}
+                              >
+                                <RotateCcw size={13} />
+                                <span>Show All Years</span>
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ) : (

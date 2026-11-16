@@ -8,7 +8,7 @@ import { Resident, Flat, FlatResidentHistory } from "@/types/database.types";
 import { formatDate } from "@/utils/dateFormatter";
 import { sanitizeMobileInput, validateMobile, validateEmail } from "@/utils/validation";
 import { AmountInput } from "@/components/common/AmountInput/AmountInput";
-import { PlusCircle, Search, UserCheck, History, Phone, Mail, UserPlus, Trash2, AlertTriangle, ShieldCheck } from "lucide-react";
+import { PlusCircle, Search, UserCheck, History, Phone, Mail, UserPlus, Trash2, AlertTriangle, ShieldCheck, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ResidentsPage() {
@@ -273,6 +273,14 @@ export default function ResidentsPage() {
     return matchesSearch && matchesType;
   });
 
+  const isFilterActive = searchTerm.trim() !== "" || typeFilter !== "ALL";
+
+  const handleResetFilters = () => {
+    setSearchTerm("");
+    setTypeFilter("ALL");
+    toast.info("Resident filters reset to defaults");
+  };
+
   return (
     <div>
       <PageHeader
@@ -312,10 +320,31 @@ export default function ResidentsPage() {
               <option value="OWNER">Owner Occupied</option>
               <option value="TENANT">Tenant / Rented</option>
             </select>
+
+            {isFilterActive && (
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 flex-shrink-0"
+                onClick={handleResetFilters}
+                title="Reset resident filters"
+              >
+                <RotateCcw size={13} />
+                <span>Reset</span>
+              </button>
+            )}
           </div>
 
-          <div className="small text-secondary">
-            Showing <strong className="text-dark">{filteredResidents.length}</strong> Active Residents
+          <div className="small text-secondary d-flex align-items-center gap-2">
+            <span>Showing <strong className="text-dark">{filteredResidents.length}</strong> Active Residents</span>
+            {isFilterActive && (
+              <button
+                type="button"
+                className="btn btn-link btn-sm p-0 text-danger text-decoration-none small"
+                onClick={handleResetFilters}
+              >
+                (Clear)
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -339,7 +368,22 @@ export default function ResidentsPage() {
               {filteredResidents.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="text-center py-5 text-secondary">
-                    {searchTerm ? `No residents matching "${searchTerm}"` : "No residents added yet. Click 'Add Resident' to register occupants."}
+                    <div className="d-flex flex-column align-items-center gap-2">
+                      <UserCheck size={32} className="text-muted opacity-50 mb-1" />
+                      <div>
+                        {searchTerm ? `No residents matching "${searchTerm}"` : "No residents match the selected filters."}
+                      </div>
+                      {isFilterActive && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5 mt-1"
+                          onClick={handleResetFilters}
+                        >
+                          <RotateCcw size={13} />
+                          <span>Reset Filters</span>
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : (

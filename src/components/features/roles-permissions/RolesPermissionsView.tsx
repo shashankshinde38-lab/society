@@ -28,6 +28,7 @@ import {
   UserPlus,
   Building2,
   EyeOff,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -855,6 +856,23 @@ export function RolesPermissionsView({ initialTab = "ROLES" }: RolesPermissionsV
                   </select>
                 </div>
 
+                {(roleSearch || roleStatusFilter !== "ALL") && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1"
+                    onClick={() => {
+                      setRoleSearch("");
+                      setRoleStatusFilter("ALL");
+                      setRolePage(1);
+                      toast.info("Role filters reset to defaults");
+                    }}
+                    title="Reset role search and status filter"
+                  >
+                    <RotateCcw size={13} />
+                    <span>Reset</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   className="btn btn-sm btn-outline-primary text-nowrap d-flex align-items-center gap-1"
@@ -876,14 +894,30 @@ export function RolesPermissionsView({ initialTab = "ROLES" }: RolesPermissionsV
                     ? "No roles match your search or filter criteria."
                     : "No roles have been created yet. Click 'Create Role' to add one."}
                 </p>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-primary-custom"
-                  onClick={handleOpenCreateRole}
-                >
-                  <PlusCircle size={14} className="me-1" />
-                  Create Your First Role
-                </button>
+                <div className="d-flex align-items-center justify-content-center gap-2">
+                  {(roleSearch || roleStatusFilter !== "ALL") && (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
+                      onClick={() => {
+                        setRoleSearch("");
+                        setRoleStatusFilter("ALL");
+                        setRolePage(1);
+                      }}
+                    >
+                      <RotateCcw size={13} />
+                      <span>Reset Role Filters</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-primary-custom"
+                    onClick={handleOpenCreateRole}
+                  >
+                    <PlusCircle size={14} className="me-1" />
+                    Create Your First Role
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="table-responsive rounded-3 border">
@@ -1158,6 +1192,24 @@ export function RolesPermissionsView({ initialTab = "ROLES" }: RolesPermissionsV
                   </select>
                 </div>
 
+                {(userSearch || userRoleFilter !== "ALL" || userStatusFilter !== "ALL") && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1"
+                    onClick={() => {
+                      setUserSearch("");
+                      setUserRoleFilter("ALL");
+                      setUserStatusFilter("ALL");
+                      setUserPage(1);
+                      toast.info("User filters reset to defaults");
+                    }}
+                    title="Reset user search, role, and status filters"
+                  >
+                    <RotateCcw size={13} />
+                    <span>Reset</span>
+                  </button>
+                )}
+
                 {/* Add User */}
                 <button
                   type="button"
@@ -1180,14 +1232,31 @@ export function RolesPermissionsView({ initialTab = "ROLES" }: RolesPermissionsV
                     ? "No users match your search or filter criteria."
                     : "No administrative accounts exist yet."}
                 </p>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-primary-custom"
-                  onClick={handleOpenAddUser}
-                >
-                  <UserPlus size={14} className="me-1" />
-                  Add Administrative User
-                </button>
+                <div className="d-flex align-items-center justify-content-center gap-2">
+                  {(userSearch || userRoleFilter !== "ALL" || userStatusFilter !== "ALL") && (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
+                      onClick={() => {
+                        setUserSearch("");
+                        setUserRoleFilter("ALL");
+                        setUserStatusFilter("ALL");
+                        setUserPage(1);
+                      }}
+                    >
+                      <RotateCcw size={13} />
+                      <span>Reset User Filters</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-primary-custom"
+                    onClick={handleOpenAddUser}
+                  >
+                    <UserPlus size={14} className="me-1" />
+                    Add Administrative User
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="table-responsive rounded-3 border">

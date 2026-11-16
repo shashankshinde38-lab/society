@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { PageHeader } from "@/components/common/PageHeader/PageHeader";
 import { DataStorage } from "@/services/dataStorage";
 import { Floor } from "@/types/database.types";
-import { PlusCircle, Search, Edit2, Trash2, Layers, Building, AlertTriangle, ShieldCheck } from "lucide-react";
+import { PlusCircle, Search, Edit2, Trash2, Layers, Building, AlertTriangle, ShieldCheck, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 export default function FloorsPage() {
@@ -109,6 +109,13 @@ export default function FloorsPage() {
       (f.description && f.description.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  const isFilterActive = searchTerm.trim() !== "";
+
+  const handleResetFilter = () => {
+    setSearchTerm("");
+    toast.info("Floor filter cleared");
+  };
+
   return (
     <div>
       <PageHeader
@@ -126,21 +133,43 @@ export default function FloorsPage() {
       {/* Top Filter and Search Bar */}
       <div className="card-premium mb-4">
         <div className="p-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
-          <div className="position-relative" style={{ maxWidth: "340px", width: "100%" }}>
-            <Search size={16} className="position-absolute text-secondary" style={{ top: "10px", left: "12px" }} />
-            <input
-              type="text"
-              className="form-control form-control-sm ps-5 bg-light"
-              placeholder="Search floors..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="d-flex align-items-center gap-2" style={{ maxWidth: "420px", width: "100%" }}>
+            <div className="position-relative flex-grow-1">
+              <Search size={16} className="position-absolute text-secondary" style={{ top: "10px", left: "12px" }} />
+              <input
+                type="text"
+                className="form-control form-control-sm ps-5 bg-light"
+                placeholder="Search floors..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            {isFilterActive && (
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 flex-shrink-0"
+                onClick={handleResetFilter}
+                title="Clear floor search"
+              >
+                <RotateCcw size={13} />
+                <span>Reset</span>
+              </button>
+            )}
           </div>
 
           <div className="d-flex align-items-center gap-2 small text-secondary">
             <span>Total Floors: <strong className="text-dark">{floors.length}</strong></span>
             <span>&bull;</span>
             <span>Total Flats: <strong className="text-dark">{floors.reduce((sum, f) => sum + (f.total_flats || 0), 0)}</strong></span>
+            {isFilterActive && (
+              <button
+                type="button"
+                className="btn btn-link btn-sm p-0 text-danger text-decoration-none small ms-2"
+                onClick={handleResetFilter}
+              >
+                (Clear Search)
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -162,7 +191,22 @@ export default function FloorsPage() {
               {filteredFloors.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="text-center py-5 text-secondary">
-                    {searchTerm ? `No floors matching "${searchTerm}"` : "No floors added yet. Click 'Add New Floor' to get started."}
+                    <div className="d-flex flex-column align-items-center gap-2">
+                      <Layers size={32} className="text-muted opacity-50 mb-1" />
+                      <div>
+                        {searchTerm ? `No floors matching "${searchTerm}"` : "No floors added yet. Click 'Add New Floor' to get started."}
+                      </div>
+                      {isFilterActive && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5 mt-1"
+                          onClick={handleResetFilter}
+                        >
+                          <RotateCcw size={13} />
+                          <span>Clear Search</span>
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : (

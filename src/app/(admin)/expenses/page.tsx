@@ -16,6 +16,7 @@ import {
   Image as ImageIcon,
   Eye,
   X,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -181,6 +182,16 @@ export default function ExpensesPage() {
     return matchesSearch && matchesCategory && matchesMethod;
   });
 
+  const isFilterActive =
+    searchTerm.trim() !== "" || categoryFilter !== "ALL" || methodFilter !== "ALL";
+
+  const handleResetFilters = () => {
+    setSearchTerm("");
+    setCategoryFilter("ALL");
+    setMethodFilter("ALL");
+    toast.info("Expense filters reset to defaults");
+  };
+
   const totalExpenseSum = expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
   return (
@@ -267,10 +278,31 @@ export default function ExpensesPage() {
               <option value="CASH">Cash</option>
               <option value="CHEQUE">Cheque</option>
             </select>
+
+            {isFilterActive && (
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 flex-shrink-0"
+                onClick={handleResetFilters}
+                title="Reset all expense filters"
+              >
+                <RotateCcw size={13} />
+                <span>Reset</span>
+              </button>
+            )}
           </div>
 
-          <div className="small text-secondary">
-            Showing <strong className="text-dark">{filteredExpenses.length}</strong> Expenses
+          <div className="small text-secondary d-flex align-items-center gap-2">
+            <span>Showing <strong className="text-dark">{filteredExpenses.length}</strong> Expenses</span>
+            {isFilterActive && (
+              <button
+                type="button"
+                className="btn btn-link btn-sm p-0 text-danger text-decoration-none small"
+                onClick={handleResetFilters}
+              >
+                (Clear)
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -295,7 +327,22 @@ export default function ExpensesPage() {
               {filteredExpenses.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-5 text-secondary">
-                    {searchTerm ? `No expenses matching "${searchTerm}"` : "No expenses recorded yet. Click 'Record New Expense' to log society bills."}
+                    <div className="d-flex flex-column align-items-center gap-2">
+                      <TrendingDown size={32} className="text-muted opacity-50 mb-1" />
+                      <div>
+                        {searchTerm ? `No expenses matching "${searchTerm}"` : "No expenses match the selected filters."}
+                      </div>
+                      {isFilterActive && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5 mt-1"
+                          onClick={handleResetFilters}
+                        >
+                          <RotateCcw size={13} />
+                          <span>Reset Filters</span>
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : (

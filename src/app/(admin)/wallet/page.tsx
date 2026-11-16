@@ -16,6 +16,7 @@ import {
   AlertCircle,
   FileSpreadsheet,
   CheckCircle2,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -45,6 +46,16 @@ export default function WalletPage() {
 
     return matchesSearch && matchesType && matchesCategory;
   });
+
+  const isFilterActive =
+    searchTerm.trim() !== "" || typeFilter !== "ALL" || categoryFilter !== "ALL";
+
+  const handleResetFilters = () => {
+    setSearchTerm("");
+    setTypeFilter("ALL");
+    setCategoryFilter("ALL");
+    toast.info("Wallet ledger filters reset to defaults");
+  };
 
   // Calculate Ledger Balances
   const openingBalance = society?.opening_balance || 0;
@@ -207,10 +218,31 @@ export default function WalletPage() {
               <option value="EXPENSE">Expense</option>
               <option value="OPENING_BALANCE">Opening Balance</option>
             </select>
+
+            {isFilterActive && (
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 flex-shrink-0"
+                onClick={handleResetFilters}
+                title="Reset all wallet ledger filters"
+              >
+                <RotateCcw size={13} />
+                <span>Reset</span>
+              </button>
+            )}
           </div>
 
-          <div className="small text-secondary">
-            Showing <strong className="text-dark">{filteredTransactions.length}</strong> Ledger Entries
+          <div className="small text-secondary d-flex align-items-center gap-2">
+            <span>Showing <strong className="text-dark">{filteredTransactions.length}</strong> Ledger Entries</span>
+            {isFilterActive && (
+              <button
+                type="button"
+                className="btn btn-link btn-sm p-0 text-danger text-decoration-none small"
+                onClick={handleResetFilters}
+              >
+                (Clear)
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -233,7 +265,22 @@ export default function WalletPage() {
               {filteredTransactions.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-center py-5 text-secondary">
-                    No transactions found
+                    <div className="d-flex flex-column align-items-center gap-2">
+                      <Wallet size={32} className="text-muted opacity-50 mb-1" />
+                      <div>
+                        {searchTerm ? `No transactions matching "${searchTerm}"` : "No wallet transactions match the selected filters."}
+                      </div>
+                      {isFilterActive && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5 mt-1"
+                          onClick={handleResetFilters}
+                        >
+                          <RotateCcw size={13} />
+                          <span>Reset Filters</span>
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : (

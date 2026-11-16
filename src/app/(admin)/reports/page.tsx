@@ -14,6 +14,7 @@ import {
   Filter,
   Layers,
   Sparkles,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
@@ -249,16 +250,32 @@ export default function ReportsPage() {
             <div className="row g-3 align-items-center justify-content-between">
               <div className="col-12 col-md-6">
                 <label className="form-label small fw-semibold text-secondary">Select Report Category</label>
-                <select
-                  className="form-select"
-                  value={reportType}
-                  onChange={(e) => setReportType(e.target.value as typeof reportType)}
-                >
-                  <option value="MAINTENANCE">Flat-wise Maintenance Collections &amp; Dues</option>
-                  <option value="EXPENSE">Society Expenses &amp; Category Breakdown</option>
-                  <option value="OUTSTANDING">Outstanding Defaulters Report</option>
-                  <option value="WALLET">Full Society Wallet Cash Book Ledger</option>
-                </select>
+                <div className="d-flex align-items-center gap-2">
+                  <select
+                    className="form-select"
+                    value={reportType}
+                    onChange={(e) => setReportType(e.target.value as typeof reportType)}
+                  >
+                    <option value="MAINTENANCE">Flat-wise Maintenance Collections &amp; Dues</option>
+                    <option value="EXPENSE">Society Expenses &amp; Category Breakdown</option>
+                    <option value="OUTSTANDING">Outstanding Defaulters Report</option>
+                    <option value="WALLET">Full Society Wallet Cash Book Ledger</option>
+                  </select>
+                  {reportType !== "MAINTENANCE" && (
+                    <button
+                      type="button"
+                      className="btn btn-outline-danger d-inline-flex align-items-center gap-1 flex-shrink-0"
+                      onClick={() => {
+                        setReportType("MAINTENANCE");
+                        toast.info("Report category reset to Flat Maintenance");
+                      }}
+                      title="Reset report category to default"
+                    >
+                      <RotateCcw size={14} />
+                      <span>Reset</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="col-12 col-md-6 text-md-end pt-3 pt-md-4">

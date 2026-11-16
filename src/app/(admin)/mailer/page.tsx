@@ -31,6 +31,7 @@ import {
   Trash2,
   Sparkles,
   BellOff,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -189,6 +190,14 @@ export default function MailerPage() {
       return matchesSearch && matchesDues;
     });
   }, [recipientsList, userSearchQuery, userDuesFilter]);
+
+  const isUsersFilterActive = userSearchQuery.trim() !== "" || userDuesFilter !== "ALL";
+
+  const handleResetUsersFilter = () => {
+    setUserSearchQuery("");
+    setUserDuesFilter("ALL");
+    toast.info("User directory filters reset to defaults");
+  };
 
   // Selection Toggles
   const handleToggleSelectAll = () => {
@@ -600,6 +609,16 @@ export default function MailerPage() {
     });
   }, [logs, logSearchQuery, logFilterStatus, logFilterType]);
 
+  const isLogsFilterActive =
+    logSearchQuery.trim() !== "" || logFilterStatus !== "ALL" || logFilterType !== "ALL";
+
+  const handleResetLogsFilter = () => {
+    setLogSearchQuery("");
+    setLogFilterStatus("ALL");
+    setLogFilterType("ALL");
+    toast.info("Audit logs filter reset to defaults");
+  };
+
   return (
     <div>
       <PageHeader
@@ -774,6 +793,18 @@ export default function MailerPage() {
                 <option value="WITH_DUES">Pending Dues Only</option>
                 <option value="NO_DUES">Paid / No Dues Only</option>
               </select>
+
+              {isUsersFilterActive && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 flex-shrink-0"
+                  onClick={handleResetUsersFilter}
+                  title="Reset user directory filters"
+                >
+                  <RotateCcw size={13} />
+                  <span>Reset</span>
+                </button>
+              )}
             </div>
 
             {/* Batch Send Action */}
@@ -825,7 +856,20 @@ export default function MailerPage() {
               {filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="text-center py-4 text-muted">
-                    No society users found.
+                    <div className="d-flex flex-column align-items-center gap-2">
+                      <Users2 size={28} className="text-muted opacity-50" />
+                      <div>No society users match the selected search or filter criteria.</div>
+                      {isUsersFilterActive && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5"
+                          onClick={handleResetUsersFilter}
+                        >
+                          <RotateCcw size={13} />
+                          <span>Reset User Filters</span>
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -1000,7 +1044,7 @@ export default function MailerPage() {
         {/* Audit Search Bar */}
         <div className="p-3 border-bottom bg-light">
           <div className="row g-2">
-            <div className="col-12 col-md-6">
+            <div className="col-12 col-md-5">
               <div className="position-relative">
                 <Search size={15} className="position-absolute text-secondary" style={{ top: "10px", left: "12px" }} />
                 <input
@@ -1035,6 +1079,19 @@ export default function MailerPage() {
                 <option value="GENERAL_ANNOUNCEMENT">Announcements</option>
               </select>
             </div>
+            {isLogsFilterActive && (
+              <div className="col-12 col-md-1 d-flex align-items-center">
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 w-100 justify-content-center"
+                  onClick={handleResetLogsFilter}
+                  title="Reset audit trail filters"
+                >
+                  <RotateCcw size={13} />
+                  <span>Reset</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1055,10 +1112,25 @@ export default function MailerPage() {
               {filteredAuditLogs.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="text-center py-5">
-                    <div className="text-muted small">
-                      <Mail size={32} className="text-secondary opacity-50 mb-2" /><br />
-                      <strong>No delivery logs recorded yet.</strong><br />
-                      Select a user from the table above and click <strong>Send Mail</strong> to dispatch genuine notifications.
+                    <div className="text-muted small d-flex flex-column align-items-center gap-2">
+                      <Mail size={32} className="text-secondary opacity-50 mb-1" />
+                      <div>
+                        <strong>No delivery logs match your filter criteria.</strong>
+                      </div>
+                      {isLogsFilterActive ? (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5 mt-1"
+                          onClick={handleResetLogsFilter}
+                        >
+                          <RotateCcw size={13} />
+                          <span>Reset Audit Filters</span>
+                        </button>
+                      ) : (
+                        <div>
+                          Select a user from the table above and click <strong>Send Mail</strong> to dispatch genuine notifications.
+                        </div>
+                      )}
                     </div>
                   </td>
                 </tr>

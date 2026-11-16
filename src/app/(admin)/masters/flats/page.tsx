@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/common/StatusBadge/StatusBadge";
 import { DataStorage } from "@/services/dataStorage";
 import { Flat, Floor, Resident } from "@/types/database.types";
 import { AmountInput } from "@/components/common/AmountInput/AmountInput";
-import { PlusCircle, Search, Edit2, Trash2, Home, CreditCard, AlertTriangle, ShieldCheck } from "lucide-react";
+import { PlusCircle, Search, Edit2, Trash2, Home, CreditCard, AlertTriangle, ShieldCheck, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 export default function FlatsPage() {
@@ -148,6 +148,16 @@ export default function FlatsPage() {
     return matchesSearch && matchesFloor && matchesStatus;
   });
 
+  const isFilterActive =
+    searchTerm.trim() !== "" || floorFilter !== "ALL" || statusFilter !== "ALL";
+
+  const handleResetFilters = () => {
+    setSearchTerm("");
+    setFloorFilter("ALL");
+    setStatusFilter("ALL");
+    toast.info("Flat master filters reset to defaults");
+  };
+
   return (
     <div>
       <PageHeader
@@ -202,11 +212,34 @@ export default function FlatsPage() {
               <option value="VACANT">VACANT</option>
               <option value="INACTIVE">INACTIVE</option>
             </select>
+
+            {isFilterActive && (
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 flex-shrink-0"
+                onClick={handleResetFilters}
+                title="Reset all flat filters"
+              >
+                <RotateCcw size={13} />
+                <span>Reset</span>
+              </button>
+            )}
           </div>
 
-          <div className="small text-secondary text-end">
-            Showing <strong className="text-dark">{filteredFlats.length}</strong> of{" "}
-            <strong className="text-dark">{flats.length}</strong> Flats
+          <div className="small text-secondary text-end d-flex align-items-center justify-content-end gap-2">
+            <span>
+              Showing <strong className="text-dark">{filteredFlats.length}</strong> of{" "}
+              <strong className="text-dark">{flats.length}</strong> Flats
+            </span>
+            {isFilterActive && (
+              <button
+                type="button"
+                className="btn btn-link btn-sm p-0 text-danger text-decoration-none small"
+                onClick={handleResetFilters}
+              >
+                (Clear)
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -231,7 +264,22 @@ export default function FlatsPage() {
               {filteredFlats.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-5 text-secondary">
-                    No flats found matching criteria
+                    <div className="d-flex flex-column align-items-center gap-2">
+                      <Home size={32} className="text-muted opacity-50 mb-1" />
+                      <div>
+                        {searchTerm ? `No flats matching "${searchTerm}"` : "No flats found matching criteria."}
+                      </div>
+                      {isFilterActive && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5 mt-1"
+                          onClick={handleResetFilters}
+                        >
+                          <RotateCcw size={13} />
+                          <span>Reset Filters</span>
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : (
