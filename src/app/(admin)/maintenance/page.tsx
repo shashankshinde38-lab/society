@@ -82,6 +82,7 @@ export default function MaintenancePage() {
   const [receiptFlat, setReceiptFlat] = useState<Flat | null>(null);
   const [receiptAllocatedMonths, setReceiptAllocatedMonths] = useState<string[]>([]);
   const [sendingReceiptEmail, setSendingReceiptEmail] = useState(false);
+  const [sendReceiptEmailOnSave, setSendReceiptEmailOnSave] = useState(false);
 
   // Full-size Image Preview Modal
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
@@ -91,8 +92,8 @@ export default function MaintenancePage() {
   const [targetFlatForRate, setTargetFlatForRate] = useState<Flat | null>(null);
   const [rateInputValue, setRateInputValue] = useState<number | "">(1500);
 
-  // Email Notifications Global Setting
-  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState<boolean>(true);
+  // Email Notifications Global Setting (Defaults to false/paused)
+  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState<boolean>(false);
 
   useEffect(() => {
     setEmailNotificationsEnabled(DataStorage.isEmailNotificationsEnabled());
@@ -176,6 +177,7 @@ export default function MaintenancePage() {
     setPaymentMethod("ONLINE_UPI");
     setPaymentDate(new Date().toISOString().split("T")[0]);
     setTransactionRef("");
+    setSendReceiptEmailOnSave(false); // SAFE BY DEFAULT: Never send receipt email automatically unless explicitly opted in
 
     if (preselectedMonthIds && preselectedMonthIds.length > 0) {
       const invs = DataStorage.getInvoices(flat.id, selectedYear).filter((i) =>
@@ -249,8 +251,8 @@ export default function MaintenancePage() {
       setReceiptAllocatedMonths(result.allocatedMonths);
       setShowReceiptModal(true);
 
-      // Automatically email invoice receipt to resident if email is registered AND email notifications are enabled
-      if (selectedFlatForPayment.current_resident?.email) {
+      // ONLY dispatch email if user explicitly opted in with the checkbox AND email notifications are enabled
+      if (sendReceiptEmailOnSave && selectedFlatForPayment.current_resident?.email) {
         if (DataStorage.isEmailNotificationsEnabled()) {
           handleSendReceiptEmail(result.payment, selectedFlatForPayment, result.allocatedMonths);
         } else {
@@ -1378,29 +1380,50 @@ export default function MaintenancePage() {
                       )}
                     </div>
 
-                    {/* Automated Email Invoice Notice */}
+                    {/* Explicit Opt-in for Receipt Email (Unchecked by default) */}
                     {selectedFlatForPayment.current_resident?.email ? (
                       <div className="col-12">
-                        {emailNotificationsEnabled ? (
-                          <div className="p-3 bg-success-subtle border border-success-subtle rounded-3 d-flex align-items-center gap-2">
-                            <Check size={16} className="text-success flex-shrink-0" />
-                            <div className="small text-success-emphasis">
-                              <strong>Automated Email Invoice Dispatch:</strong> Upon saving, an official payment receipt email with the generated invoice PDF attached will be dispatched to <strong>{selectedFlatForPayment.current_resident.email}</strong>.
-                            </div>
+                        <div
+                          className={`p-3 rounded-3 border ${
+                            emailNotificationsEnabled
+                              ? "bg-light border-light-subtle"
+                              : "bg-warning-subtle border-warning-subtle"
+                          }`}
+                        >
+                          <div className="form-check d-flex align-items-center gap-2 mb-0">
+                            <input
+                              type="checkbox"
+                              className="form-check-input mt-0 cursor-pointer"
+                              id="sendEmailReceiptCheck"
+                              checked={sendReceiptEmailOnSave && emailNotificationsEnabled}
+                              disabled={!emailNotificationsEnabled}
+                              onChange={(e) => setSendReceiptEmailOnSave(e.target.checked)}
+                              style={{ width: "1.25em", height: "1.25em", cursor: emailNotificationsEnabled ? "pointer" : "not-allowed" }}
+                            />
+                            <label
+                              className="form-check-label small fw-semibold text-dark cursor-pointer d-flex align-items-center gap-1.5"
+                              htmlFor="sendEmailReceiptCheck"
+                            >
+                              <Mail size={14} className={emailNotificationsEnabled ? "text-primary" : "text-muted"} />
+                              <span>Send payment receipt PDF via email to resident ({selectedFlatForPayment.current_resident.email})</span>
+                            </label>
                           </div>
-                        ) : (
-                          <div className="p-3 bg-warning-subtle border border-warning-subtle rounded-3 d-flex align-items-center gap-2">
-                            <BellOff size={16} className="text-warning flex-shrink-0" />
-                            <div className="small text-warning-emphasis">
-                              <strong>Email Notifications Paused (OFF):</strong> Master email toggle is OFF. Payment will be recorded, but no receipt email will be dispatched. You can view or download the PDF receipt directly after saving.
+                          {!emailNotificationsEnabled ? (
+                            <div className="small text-danger mt-1.5 d-flex align-items-center gap-1">
+                              <BellOff size={13} />
+                              <span>Master email notifications are paused (OFF). No emails will be sent.</span>
                             </div>
-                          </div>
-                        )}
+                          ) : (
+                            <div className="small text-muted mt-1 ps-4">
+                              Default is unchecked. You can also view, print, or email the receipt anytime from the preview popup.
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <div className="col-12">
                         <div className="p-2.5 bg-light border rounded-3 small text-muted">
-                          ℹ️ No email address registered for this flat. You can download or print the PDF receipt directly after saving.
+                          ℹ️ No email address registered for this flat. You can view or download the PDF receipt directly after saving.
                         </div>
                       </div>
                     )}

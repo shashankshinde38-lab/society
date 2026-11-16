@@ -10,6 +10,8 @@ import {
   LogOut,
   Settings,
   ChevronDown,
+  Mail,
+  BellOff,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { clearAdminSession } from "@/features/auth/authActions";
@@ -34,7 +36,30 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const router = useRouter();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [emailEnabled, setEmailEnabled] = useState(false);
   const supabase = createClient();
+
+  React.useEffect(() => {
+    setEmailEnabled(DataStorage.isEmailNotificationsEnabled());
+    const handleToggleEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ enabled: boolean }>;
+      setEmailEnabled(customEvent.detail?.enabled ?? DataStorage.isEmailNotificationsEnabled());
+    };
+    window.addEventListener("email_notifications_toggled", handleToggleEvent);
+    return () => window.removeEventListener("email_notifications_toggled", handleToggleEvent);
+  }, []);
+
+  const handleToggleMasterEmail = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const nextVal = !emailEnabled;
+    DataStorage.setEmailNotificationsEnabled(nextVal);
+    setEmailEnabled(nextVal);
+    if (nextVal) {
+      toast.success("Master Email Notifications enabled! Outgoing emails are allowed.");
+    } else {
+      toast.warning("Master Email Notifications paused (OFF)! All outgoing emails are blocked.");
+    }
+  };
 
   const activeEmail = currentUser?.email || userEmail || "admin@gmail.com";
   const activeName = currentUser?.name || (currentUser?.role_name === "Accountant" ? "Pratik Mohol" : "Administrator");
@@ -114,6 +139,50 @@ export const Header: React.FC<HeaderProps> = ({
               return m >= 4 ? `FY ${y}–${y + 1}` : `FY ${y - 1}–${y}`;
             })()}
           </span>
+        </div>
+
+        {/* Global Master Email Notification Switch */}
+        <div
+          className={`d-flex align-items-center gap-2 px-2.5 py-1 rounded-pill border cursor-pointer ${
+            emailEnabled ? "bg-success-subtle border-success-subtle" : "bg-danger-subtle border-danger-subtle"
+          }`}
+          onClick={handleToggleMasterEmail}
+          style={{ cursor: "pointer", userSelect: "none" }}
+          title={
+            emailEnabled
+              ? "Master Email Notifications: ON (Click to Pause all emails)"
+              : "Master Email Notifications: PAUSED / OFF (Click to Enable)"
+          }
+        >
+          {emailEnabled ? (
+            <Mail size={15} className="text-success flex-shrink-0" />
+          ) : (
+            <BellOff size={15} className="text-danger flex-shrink-0" />
+          )}
+          <span className="small fw-bold text-dark d-none d-md-inline" style={{ fontSize: "0.78rem" }}>
+            Emails:
+          </span>
+          <span
+            className={`badge rounded-pill fw-bold ${
+              emailEnabled ? "bg-success text-white" : "bg-danger text-white"
+            }`}
+            style={{ fontSize: "0.7rem", padding: "2px 7px" }}
+          >
+            {emailEnabled ? "ON" : "OFF"}
+          </span>
+          <div className="form-check form-switch m-0 p-0 d-flex align-items-center" style={{ minHeight: "auto" }}>
+            <input
+              type="checkbox"
+              className="form-check-input ms-1 cursor-pointer"
+              role="switch"
+              checked={emailEnabled}
+              onChange={(e) => {
+                e.stopPropagation();
+                handleToggleMasterEmail();
+              }}
+              style={{ width: "2em", height: "1.1em", cursor: "pointer" }}
+            />
+          </div>
         </div>
 
         {/* Notification Icon */}

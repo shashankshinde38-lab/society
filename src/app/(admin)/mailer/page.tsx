@@ -70,7 +70,7 @@ export default function MailerPage() {
   // Loading & Execution States
   const [isBatchSending, setIsBatchSending] = useState(false);
   const [sendingCron, setSendingCron] = useState(false);
-  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState<boolean>(true);
+  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState<boolean>(false);
 
   useEffect(() => {
     setEmailNotificationsEnabled(DataStorage.isEmailNotificationsEnabled());

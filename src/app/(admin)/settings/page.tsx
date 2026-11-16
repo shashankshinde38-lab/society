@@ -9,7 +9,7 @@ import { toast } from "sonner";
 export default function SettingsPage() {
   const [autoBackup, setAutoBackup] = useState(true);
   const [auditLogging, setAuditLogging] = useState(true);
-  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [emailNotifications, setEmailNotifications] = useState(false);
 
   useEffect(() => {
     setEmailNotifications(DataStorage.isEmailNotificationsEnabled());

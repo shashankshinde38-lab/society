@@ -127,17 +127,17 @@ export const DataStorage = {
     const tenantAmount = stored.tenant_monthly_amount ?? 1500;
 
     // Check standalone unversioned key and cookie first to ensure persistence across versions
-    let emailEnabled = stored.email_notifications_enabled ?? true;
+    let emailEnabled = stored.email_notifications_enabled ?? false;
     if (typeof window !== "undefined") {
       const standalone = window.localStorage.getItem("parijat_master_email_notifications_toggle");
-      if (standalone === "false") {
-        emailEnabled = false;
-      } else if (standalone === "true") {
+      if (standalone === "true") {
         emailEnabled = true;
+      } else if (standalone === "false") {
+        emailEnabled = false;
       } else {
         const match = document.cookie.match(/(?:^|; )email_notifications_enabled=([^;]*)/);
-        if (match && match[1] === "false") emailEnabled = false;
-        else if (match && match[1] === "true") emailEnabled = true;
+        if (match && match[1] === "true") emailEnabled = true;
+        else if (match && match[1] === "false") emailEnabled = false;
       }
     }
 
@@ -153,15 +153,15 @@ export const DataStorage = {
   isEmailNotificationsEnabled(): boolean {
     if (typeof window !== "undefined") {
       const standalone = window.localStorage.getItem("parijat_master_email_notifications_toggle");
-      if (standalone === "false") return false;
       if (standalone === "true") return true;
+      if (standalone === "false") return false;
 
       const match = document.cookie.match(/(?:^|; )email_notifications_enabled=([^;]*)/);
-      if (match && match[1] === "false") return false;
       if (match && match[1] === "true") return true;
+      if (match && match[1] === "false") return false;
     }
     const settings = this.getSettings();
-    return settings.email_notifications_enabled !== false;
+    return settings.email_notifications_enabled === true;
   },
   setEmailNotificationsEnabled(enabled: boolean): boolean {
     this.updateSettings({ email_notifications_enabled: enabled });

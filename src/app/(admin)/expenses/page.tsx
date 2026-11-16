@@ -41,7 +41,7 @@ export default function ExpensesPage() {
   const [invoiceBillNo, setInvoiceBillNo] = useState("");
   const [description, setDescription] = useState("");
   const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
-  const [notifyResidents, setNotifyResidents] = useState(true);
+  const [notifyResidents, setNotifyResidents] = useState(false);
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
 
   const loadData = () => {
@@ -64,7 +64,7 @@ export default function ExpensesPage() {
     setInvoiceBillNo("");
     setDescription("");
     setAttachmentUrl(null);
-    setNotifyResidents(true);
+    setNotifyResidents(false);
     setShowAddModal(true);
   };
 
