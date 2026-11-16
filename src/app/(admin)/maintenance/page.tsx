@@ -1045,7 +1045,7 @@ export default function MaintenancePage() {
         >
           <div className="modal-dialog modal-dialog-centered modal-lg maintenance-modal-dialog">
             <div className="modal-content border-0 shadow-lg rounded-4 maintenance-modal-content">
-              <div className="modal-header border-bottom px-4 pt-4 pb-3 flex-shrink-0">
+              <div className="modal-header border-bottom px-4 pt-4 pb-3 flex-shrink-0 d-flex justify-content-between align-items-start">
                 <div>
                   <h5 className="modal-title fw-bold text-dark mb-0">
                     Record Maintenance Payment &mdash; Flat {selectedFlatForPayment.flat_number}
@@ -1054,7 +1054,13 @@ export default function MaintenancePage() {
                     Atomic transaction: automatically clears pending dues and updates Society Wallet.
                   </span>
                 </div>
-                <button type="button" className="btn-close" onClick={() => setShowPaymentModal(false)} />
+                <button
+                  type="button"
+                  className="btn-close ms-2 mt-1 flex-shrink-0"
+                  onClick={() => setShowPaymentModal(false)}
+                  aria-label="Close"
+                  title="Close"
+                />
               </div>
 
               <form onSubmit={handleRecordPayment} className="d-flex flex-column flex-grow-1 min-h-0 overflow-hidden">
@@ -1294,7 +1300,7 @@ export default function MaintenancePage() {
           >
             <div className="modal-dialog modal-dialog-centered modal-xl maintenance-modal-dialog maintenance-matrix-dialog">
               <div className="modal-content border-0 shadow-lg rounded-4 maintenance-modal-content">
-                <div className="modal-header border-bottom px-4 pt-4 pb-3 flex-shrink-0">
+                <div className="modal-header border-bottom px-4 pt-4 pb-3 flex-shrink-0 d-flex justify-content-between align-items-start">
                   <div>
                     <div className="d-flex align-items-center gap-2 flex-wrap mb-1">
                       <h5 className="modal-title fw-bold text-dark mb-0">
@@ -1373,7 +1379,13 @@ export default function MaintenancePage() {
                       )}
                     </div>
                   </div>
-                  <button type="button" className="btn-close" onClick={() => setShowMatrixModal(false)} />
+                  <button
+                    type="button"
+                    className="btn-close ms-3 mt-1 flex-shrink-0"
+                    onClick={() => setShowMatrixModal(false)}
+                    aria-label="Close"
+                    title="Close"
+                  />
                 </div>
 
                 <div className="modal-body p-4 overflow-y-auto" style={{ maxHeight: "calc(100dvh - 210px)" }}>
@@ -1592,11 +1604,33 @@ export default function MaintenancePage() {
           tabIndex={-1}
           style={{ backgroundColor: "rgba(15, 23, 42, 0.6)", zIndex: 1070, overflowY: "auto" }}
         >
-          <div className="modal-dialog modal-dialog-centered maintenance-modal-dialog">
+          <div className="modal-dialog modal-dialog-centered maintenance-modal-dialog" style={{ maxWidth: "620px", width: "95%" }}>
             <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden maintenance-modal-content">
-              {/* Receipt Header Banner */}
-              <div className="p-4 text-white flex-shrink-0" style={{ background: "linear-gradient(135deg, #0f172a, #2563eb)" }}>
-                <div className="d-flex align-items-center justify-content-between mb-2">
+              {/* Receipt Header Banner with Right-Top Cross Button */}
+              <div
+                className="p-4 text-white flex-shrink-0 position-relative"
+                style={{ background: "linear-gradient(135deg, #0f172a, #2563eb)" }}
+              >
+                {/* Cross Button at Right Top Corner */}
+                <button
+                  type="button"
+                  className="btn btn-sm position-absolute top-0 end-0 m-3 p-1 rounded-circle d-flex align-items-center justify-content-center text-white"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.18)",
+                    border: "1px solid rgba(255, 255, 255, 0.3)",
+                    width: "32px",
+                    height: "32px",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                  onClick={() => setShowReceiptModal(false)}
+                  aria-label="Close"
+                  title="Close (Esc)"
+                >
+                  <X size={18} />
+                </button>
+
+                <div className="d-flex align-items-center gap-2 mb-2 pe-5">
                   <span className="badge bg-success-subtle text-success border">Payment Confirmed</span>
                   <span className="small text-light opacity-75">{formatDate(activeReceipt.payment_date)}</span>
                 </div>
@@ -1665,7 +1699,7 @@ export default function MaintenancePage() {
                 >
                   Close
                 </button>
-                <div className="action-buttons maintenance-receipt-actions">
+                <div className="d-flex align-items-center flex-wrap gap-2 maintenance-receipt-actions">
                   {receiptFlat.current_resident?.email && (
                     <button
                       type="button"
@@ -1681,7 +1715,7 @@ export default function MaintenancePage() {
                       ) : (
                         <>
                           <Mail size={15} />
-                          <span>Email Invoice to Resident</span>
+                          <span>Email Invoice</span>
                         </>
                       )}
                     </button>
@@ -1726,11 +1760,11 @@ export default function MaintenancePage() {
                 </h6>
                 <button
                   type="button"
-                  className="btn btn-sm btn-outline-light"
+                  className="btn-close btn-close-white"
                   onClick={() => setPreviewImage(null)}
-                >
-                  <X size={16} />
-                </button>
+                  aria-label="Close"
+                  title="Close"
+                />
               </div>
               <div className="modal-body p-3 text-center bg-black d-flex justify-content-center align-items-center" style={{ minHeight: "300px" }}>
                 <img
@@ -1761,7 +1795,7 @@ export default function MaintenancePage() {
           >
             <div className="modal-dialog modal-dialog-centered maintenance-modal-dialog">
               <div className="modal-content border-0 shadow-lg rounded-4 maintenance-modal-content">
-                <div className="modal-header border-bottom px-4 pt-4 pb-3 flex-shrink-0">
+                <div className="modal-header border-bottom px-4 pt-4 pb-3 flex-shrink-0 d-flex justify-content-between align-items-start">
                   <div className="d-flex align-items-center gap-2">
                     <div className="p-2 bg-primary-subtle text-primary rounded-circle">
                       <Settings2 size={20} />
@@ -1777,8 +1811,10 @@ export default function MaintenancePage() {
                   </div>
                   <button
                     type="button"
-                    className="btn-close"
+                    className="btn-close ms-2 mt-1 flex-shrink-0"
                     onClick={() => setShowSetRateModal(false)}
+                    aria-label="Close"
+                    title="Close"
                   />
                 </div>
 
