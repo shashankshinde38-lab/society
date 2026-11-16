@@ -724,14 +724,15 @@ export default function MaintenancePage() {
                     <th>Type</th>
                     <th>Monthly Rate</th>
                     <th>Outstanding Dues</th>
-                    <th>{selectedYear === 2026 ? "Current Month" : `${selectedYear} Status`}</th>
+                    <th>Outstanding Status</th>
+                    <th>Current Month Status</th>
                     <th className="text-end">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredFlats.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="text-center py-5 text-secondary">
+                      <td colSpan={9} className="text-center py-5 text-secondary">
                         {searchTerm ? `No flats matching "${searchTerm}"` : "No flats added yet. Add flats in Masters > Flats."}
                       </td>
                     </tr>
@@ -753,6 +754,29 @@ export default function MaintenancePage() {
                       const currentMonthInv = invoices.find(
                         (i) => i.flat_id === flat.id && i.month === currentMonthNum && i.year === selectedYear
                       );
+
+                      // Earlier maintenance dues (all invoices prior to current month in selected cycle or prior years)
+                      const earlierInvoices = invoices.filter(
+                        (i) =>
+                          i.flat_id === flat.id &&
+                          (i.year < selectedYear || (i.year === selectedYear && i.month < currentMonthNum))
+                      );
+                      const earlierPendingDue = earlierInvoices.reduce(
+                        (sum, i) => sum + Number(i.due_amount || 0),
+                        0
+                      );
+                      const isEarlierPaid = earlierPendingDue === 0;
+
+                      // Current month status: strictly PAID or UNPAID
+                      const isCurrentMonthPaid = selectedYear === 2026
+                        ? (!!currentMonthInv && (
+                            currentMonthInv.status === "PAID" ||
+                            currentMonthInv.status === "ADVANCE_COVERED" ||
+                            (Number(currentMonthInv.paid_amount || 0) > 0 && Number(currentMonthInv.due_amount || 0) === 0)
+                          ))
+                        : selectedYear < 2026
+                          ? (flatYearDue === 0 && flatYearPaid > 0)
+                          : (flatYearPaid > 0 && flatYearDue === 0);
 
                       return (
                         <tr key={flat.id}>
@@ -806,55 +830,20 @@ export default function MaintenancePage() {
                               <span className="text-success small fw-semibold">₹0</span>
                             )}
                           </td>
+                          {/* Outstanding Status (Earlier Maintenance: PAID / UNPAID) */}
                           <td>
-                            {selectedYear === 2026 ? (
-                              <StatusBadge
-                                status={currentMonthInv ? currentMonthInv.status : "NO_DUES"}
-                                label={
-                                  !currentMonthInv || currentMonthInv.status === "NO_DUES"
-                                    ? "NO DUES"
-                                    : currentMonthInv.status === "ADVANCE_COVERED"
-                                      ? "ADVANCE"
-                                      : currentMonthInv.status === "UNPAID"
-                                        ? "UNPAID"
-                                        : currentMonthInv.status === "PARTIAL"
-                                          ? "PARTIAL"
-                                          : "PAID"
-                                }
-                              />
-                            ) : selectedYear > 2026 ? (
-                              flatYearPaid > 0 && flatYearDue === 0 ? (
-                                <StatusBadge
-                                  status="PAID"
-                                  label={`${selectedYear} ADVANCE PAID`}
-                                />
-                              ) : flatYearPaid > 0 && flatYearDue > 0 ? (
-                                <StatusBadge
-                                  status="PARTIAL"
-                                  label={`${selectedYear} PARTIAL (₹${flatYearPaid.toLocaleString()})`}
-                                />
-                              ) : flatYearDue > 0 ? (
-                                <StatusBadge
-                                  status="UNPAID"
-                                  label={`${selectedYear} PENDING (₹${flatYearDue.toLocaleString()})`}
-                                />
-                              ) : (
-                                <span className="badge bg-secondary-subtle text-secondary border fw-normal py-1 px-2">
-                                  UPCOMING &bull; NOT BILLED
-                                </span>
-                              )
+                            {isEarlierPaid ? (
+                              <StatusBadge status="PAID" label="PAID" />
                             ) : (
-                              /* Historical year e.g. 2025 */
-                              <StatusBadge
-                                status={flatYearDue > 0 ? "UNPAID" : flatYearPaid > 0 ? "PAID" : "NO_DUES"}
-                                label={
-                                  flatYearDue > 0
-                                    ? `${selectedYear} PENDING (₹${flatYearDue.toLocaleString()})`
-                                    : flatYearPaid > 0
-                                      ? `${selectedYear} ALL PAID`
-                                      : "NO RECORDS"
-                                }
-                              />
+                              <StatusBadge status="UNPAID" label="UNPAID" />
+                            )}
+                          </td>
+                          {/* Current Month Status (PAID / UNPAID) */}
+                          <td>
+                            {isCurrentMonthPaid ? (
+                              <StatusBadge status="PAID" label="PAID" />
+                            ) : (
+                              <StatusBadge status="UNPAID" label="UNPAID" />
                             )}
                           </td>
                           <td className="text-end">
